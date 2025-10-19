@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "159286426351",
+    "project_id": "sensars-eurostars-a496a",
+    "storage_bucket": "sensars-eurostars-a496a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:159286426351:android:909398495c1021cceab91a",
+        "android_client_info": {
+          "package_name": "com.sensars.eurostars"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCShTBoYPAkQP4XEuaYi9IDQGMc-un4ipc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

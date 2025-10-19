@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -42,6 +43,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     // Compose
     implementation("androidx.compose.ui:ui:1.7.0")
     implementation("androidx.compose.material3:material3:1.3.0")
@@ -62,9 +64,10 @@ dependencies {
     implementation("com.jakewharton.timber:timber:5.0.1")
 
     // Firebase (ready for later epics)
-    implementation(platform("com.google.firebase:firebase-bom:33.4.0"))
-    implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-storage-ktx")
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-auth")
 
     // Optional window size classes for tablet/phone responsive UI
     implementation("androidx.compose.material3:material3-window-size-class:1.3.0")
