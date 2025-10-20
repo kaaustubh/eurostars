@@ -8,6 +8,7 @@ import com.sensars.eurostars.ui.screens.clinician.ClinicianLoginScreen
 import com.sensars.eurostars.ui.screens.clinician.ClinicianSignupScreen
 import com.sensars.eurostars.ui.screens.clinician.VerifyEmailScreen
 import com.sensars.eurostars.ui.screens.patient.PatientLoginScreen
+import com.sensars.sensole.ui.screens.clinician.ClinicianHomeScreen
 
 
 @Composable
@@ -78,6 +79,7 @@ fun NavHost(navController: NavHostController) {
                 }
             )
         }
+        composable(Routes.CLINICIAN_HOME) { ClinicianHomeScreen() }
     }
 }
 
