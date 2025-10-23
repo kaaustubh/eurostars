@@ -1,5 +1,6 @@
 package com.sensars.eurostars.ui.navigation
 
+import PatientsScreen
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -14,7 +15,14 @@ fun ClinicianDashboardNavHost(navController: NavHostController) {
         startDestination = ClinicianTab.Dashboard.route
     ) {
         composable(ClinicianTab.Dashboard.route) { Text("Dashboard View") }
-        composable(ClinicianTab.Patients.route)  { Text("Patients List View") }
+        composable(ClinicianTab.Patients.route) {
+            PatientsScreen(
+                onAddPatient = {
+                    // TODO: navController.navigate("add_patient")
+                }
+            )
+        }
+
         composable(ClinicianTab.Reports.route)   { Text("Reports View") }
         composable(ClinicianTab.Settings.route)  { Text("Settings View") }
     }
