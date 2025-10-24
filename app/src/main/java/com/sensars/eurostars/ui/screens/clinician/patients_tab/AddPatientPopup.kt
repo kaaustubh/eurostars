@@ -27,7 +27,9 @@ import com.sensars.eurostars.ui.design.Aquamarine
 fun AddPatientPopup(
     isVisible: Boolean,
     onDismiss: () -> Unit,
-    onCreatePatient: (PatientData) -> Unit
+    onCreatePatient: (PatientData) -> Unit,
+    isLoading: Boolean = false,
+    errorMessage: String? = null
 ) {
     if (isVisible) {
         var patientId by remember { mutableStateOf("") }
@@ -184,6 +186,17 @@ fun AddPatientPopup(
 
                         Spacer(Modifier.height(32.dp))
 
+                        // Error message display
+                        if (errorMessage != null) {
+                            Text(
+                                text = errorMessage,
+                                color = Color.Red,
+                                fontSize = 14.sp,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(16.dp))
+                        }
+
                         // Action buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -212,7 +225,7 @@ fun AddPatientPopup(
                             // Create patient button
                             Button(
                                 onClick = {
-                                    if (isFormValid) {
+                                    if (isFormValid && !isLoading) {
                                         onCreatePatient(
                                             PatientData(
                                                 id = patientId,
@@ -221,23 +234,31 @@ fun AddPatientPopup(
                                                 height = height
                                             )
                                         )
-                                        onDismiss()
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
-                                enabled = isFormValid,
+                                enabled = isFormValid && !isLoading,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isFormValid) Aquamarine else Color.Gray,
+                                    containerColor = if (isFormValid && !isLoading) Aquamarine else Color.Gray,
                                     disabledContainerColor = Color.Gray
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text(
-                                    text = "Create a patient",
-                                    color = if (isFormValid) Color.White else Color.LightGray,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 14.sp
-                                )
+                                if (isLoading) {
+                                    Text(
+                                        text = "Creating...",
+                                        color = Color.LightGray,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 14.sp
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Create a patient",
+                                        color = if (isFormValid) Color.White else Color.LightGray,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 14.sp
+                                    )
+                                }
                             }
                         }
                     }
