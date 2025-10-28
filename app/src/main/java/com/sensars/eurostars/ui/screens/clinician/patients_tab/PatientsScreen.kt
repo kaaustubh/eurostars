@@ -47,8 +47,7 @@ fun PatientsScreen(
             patients
         } else {
             patients.filter { patient ->
-                patient.patientId.contains(query, ignoreCase = true) ||
-                patient.originOfPain.contains(query, ignoreCase = true)
+                patient.patientId.contains(query, ignoreCase = true)
             }
         }
     }
