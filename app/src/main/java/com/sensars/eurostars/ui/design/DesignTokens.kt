@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 val MainIvory      = Color(0xFFF6EFE9)
 val Aquamarine     = Color(0xFF588A94)
 val MainLightGreen = Color(0xFFB1C2BE)
+val LightGreen100  = Color(0xFFF7F9F8) // Light green 100
 val MainBrown      = Color(0xFFCDA17C)
 val MainDarkBlue   = Color(0xFF3A6470)
 val MainOrange     = Color(0xFFDD9178)
