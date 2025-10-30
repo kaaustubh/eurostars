@@ -15,7 +15,7 @@ import com.sensars.eurostars.ui.utils.rememberWindowWidthClass
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClinicianHomeScreen() {
+fun ClinicianHomeScreen(onLogout: () -> Unit = {}) {
     val widthClass = rememberWindowWidthClass()
 
     // Child navController dedicated to the dashboard tabs
@@ -32,7 +32,8 @@ fun ClinicianHomeScreen() {
             if (widthClass != WindowWidthSizeClass.Compact) {
                 ClinicianTabBar(
                     navController = dashboardNav,
-                    modifier = Modifier.width(84.dp)
+                    modifier = Modifier.width(84.dp),
+                    onLogout = onLogout
                 )
             }
             // Main pane: the nested dashboard graph content

@@ -11,6 +11,8 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.firestore
 import com.sensars.eurostars.data.SessionRepository
+import com.sensars.eurostars.data.RoleRepository
+import com.sensars.eurostars.data.UserRole
 import kotlinx.coroutines.launch
 
 /**
@@ -22,6 +24,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     private val auth = FirebaseAuth.getInstance()
     private val db = Firebase.firestore
     private val session = SessionRepository(app)
+    private val roleRepo = RoleRepository(app)
 
     // -------------------- Sign Up --------------------
 
@@ -89,8 +92,11 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 when {
                     user == null -> onError("Login succeeded but user is null. Try again.")
                     user.isEmailVerified -> {
-                        viewModelScope.launch { session.setClinician(email) }
-                        onVerified()
+                        viewModelScope.launch {
+                            session.setClinician(email)
+                            roleRepo.setRole(UserRole.CLINICIAN)
+                            onVerified()
+                        }
                     }
                     else -> onNeedsVerification()
                 }
@@ -129,7 +135,10 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
 
     fun signOut(onDone: () -> Unit) {
         auth.signOut()
-        viewModelScope.launch { session.clear() }.invokeOnCompletion { onDone() }
+        viewModelScope.launch {
+            session.clear()
+            roleRepo.clearRole()
+        }.invokeOnCompletion { onDone() }
     }
 
     fun currentUserEmail(): String? = auth.currentUser?.email

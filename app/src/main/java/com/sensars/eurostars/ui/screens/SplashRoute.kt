@@ -1,8 +1,6 @@
 package com.sensars.eurostars.ui.screens
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import com.sensars.eurostars.data.UserRole
 
 @Composable
@@ -19,12 +18,12 @@ fun SplashRoute(
     onClinician: () -> Unit,
     onNoRole: () -> Unit
 ) {
-    val role by readRole().collectAsState(initial = null as UserRole?)
-    LaunchedEffect(role) {
+    LaunchedEffect(Unit) {
+        val role = readRole().first()
         when (role) {
-            UserRole.PATIENT   -> onPatient()
+            UserRole.PATIENT -> onPatient()
             UserRole.CLINICIAN -> onClinician()
-            null               -> onNoRole()
+            null -> onNoRole()
         }
     }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))

@@ -19,7 +19,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 @Composable
 fun ClinicianTabBar(
     navController: NavController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLogout: () -> Unit = {}
 ) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
@@ -37,6 +38,8 @@ fun ClinicianTabBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
+        var showLogoutConfirm by remember { mutableStateOf(false) }
+
         Spacer(Modifier.height(24.dp))
 
         ClinicianTab.values().forEach { tab ->
@@ -78,6 +81,46 @@ fun ClinicianTabBar(
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Logout button at the bottom
+        Box(
+            modifier = Modifier
+                .padding(vertical = 16.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.Transparent)
+                .width(72.dp)
+                .height(48.dp)
+                .clickable { showLogoutConfirm = true },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "Logout",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = iconColor,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+        }
+
+        if (showLogoutConfirm) {
+            AlertDialog(
+                onDismissRequest = { showLogoutConfirm = false },
+                title = { Text("Logging out?") },
+                text = { Text("You will need to log in again.") },
+                confirmButton = {
+                    TextButton(onClick = { showLogoutConfirm = false; onLogout() }) {
+                        Text("Log out")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutConfirm = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }

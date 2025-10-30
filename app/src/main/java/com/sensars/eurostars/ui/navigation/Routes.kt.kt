@@ -1,4 +1,5 @@
 object Routes {
+    const val SPLASH = "splash"
     const val ROLE_SELECT = "role_select"
     const val CLINICIAN_LOGIN = "clinician_login"
     const val PATIENT_LOGIN = "patient_login"
