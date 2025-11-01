@@ -24,6 +24,8 @@ fun ClinicianDashboardNavHost(navController: NavHostController) {
         }
 
         composable(ClinicianTab.Reports.route)   { Text("Reports View") }
-        composable(ClinicianTab.Settings.route)  { Text("Settings View") }
+        composable(ClinicianTab.Settings.route)  { 
+            com.sensars.eurostars.ui.screens.clinician.settings.SettingsScreen()
+        }
     }
 }

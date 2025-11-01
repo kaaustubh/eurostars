@@ -1,6 +1,8 @@
 package com.sensars.sensole.ui.screens.patient
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
@@ -30,10 +32,24 @@ fun PatientHomeScreen(onLogout: () -> Unit = {}) {
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
             Text("Patient Dashboard (placeholder)")
             Spacer(Modifier.height(8.dp))
             Text("• Pair sensors\n• Walking Mode\n• Session History")
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            var showReleaseNotes by remember { mutableStateOf(false) }
+            com.sensars.eurostars.ui.screens.shared.AboutSection(
+                showReleaseNotes = showReleaseNotes,
+                onShowReleaseNotesChange = { showReleaseNotes = it }
+            )
         }
 
         // Logout confirmation dialog

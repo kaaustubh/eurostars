@@ -12,17 +12,12 @@ All notable changes to this project will be documented in this file.
 - **Patient Session Management**: Patients remain logged in after app restart with persistent session storage
 - **Patient Logout**: Added logout functionality for patient role with confirmation dialog
 - **Calendar Date Picker**: Replaced text input with interactive calendar picker for "Date of last Ulcer" field
-- **Settings Screen**: Added dedicated Settings screen for clinicians accessible from the tab bar, displaying app version and release notes
-- **In-App Release Notes**: Implemented release notes viewer with Markdown formatting support, accessible from Settings (clinicians) and About section (patients)
 
 ### Improvements
 - **Date Input UX**: Date picker automatically formats input to YYYY/MM/DD format
 - **Date Validation**: Date picker prevents selection of future dates to ensure data accuracy
 - **Mobile-Optimized Patient Screens**: Patient login and home screens designed for optimal mobile compatibility
 - **Error Handling**: Improved error messages for patient authentication failures and network issues
-- **Version Display**: Added app version and build number display in Settings (clinician) and About section (patient)
-- **Markdown Rendering**: Release notes now display with proper formatting (headers, lists, bold text, code blocks)
-- **Scrollable Release Notes**: Release notes dialog is now vertically scrollable for better readability
 
 ### Technical
 - Added PatientAuthViewModel for patient authentication logic and session management
@@ -30,10 +25,6 @@ All notable changes to this project will be documented in this file.
 - Enhanced navigation to include PATIENT_HOME route
 - Updated PatientHomeScreen with logout functionality
 - Improved patient ID lookup with fallback mechanism for numeric matching
-- Created AppVersion utility for retrieving version information from PackageManager
-- Added ReleaseNotesReader utility to load release notes from assets
-- Created reusable AboutSection component for version and release notes display
-- Implemented custom MarkdownText composable for rendering Markdown in Compose
 - Set version to 0.0.2(2) with versionCode 2
 
 ---
