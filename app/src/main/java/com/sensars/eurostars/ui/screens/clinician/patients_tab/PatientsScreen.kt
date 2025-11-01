@@ -122,6 +122,9 @@ fun PatientsScreen(
                 weightInput = patientData.weight,
                 ageInput = patientData.age,
                 heightInput = patientData.height,
+                neuropathicLeg = patientData.neuropathicLeg,
+                dateOfLastUlcer = patientData.dateOfLastUlcer,
+                ulcerActive = patientData.ulcerActive,
                 onSuccess = {
                     setShowAddPatientPopup(false)
                     // Patient list will be refreshed automatically via loadPatients() in ViewModel

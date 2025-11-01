@@ -47,6 +47,9 @@ class PatientsViewModel(
         weightInput: String,
         ageInput: String,
         heightInput: String,
+        neuropathicLeg: String = "",
+        dateOfLastUlcer: String = "",
+        ulcerActive: String = "",
         onSuccess: () -> Unit
     ) {
         _error.value = null
@@ -67,6 +70,9 @@ class PatientsViewModel(
             weightKg = weight,
             ageYears = age,
             heightCm = height,
+            neuropathicLeg = neuropathicLeg.trim(),
+            dateOfLastUlcer = dateOfLastUlcer.trim(),
+            ulcerActive = ulcerActive.trim(),
             onSuccess = {
                 _loading.value = false
                 onSuccess()

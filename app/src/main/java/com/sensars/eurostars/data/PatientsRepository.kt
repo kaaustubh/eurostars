@@ -16,6 +16,9 @@ class PatientsRepository {
         weightKg: Int,
         ageYears: Int,
         heightCm: Int,
+        neuropathicLeg: String = "",
+        dateOfLastUlcer: String = "",
+        ulcerActive: String = "",
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -31,7 +34,7 @@ class PatientsRepository {
                     onError("Patient ID already exists.")
                 } else {
                     val now = Timestamp.now()
-                    val data = mapOf(
+                    val data = mutableMapOf(
                         "patientId" to patientId,
                         "clinicianUid" to uid,
                         "weightKg" to weightKg,
@@ -40,6 +43,18 @@ class PatientsRepository {
                         "createdAt" to now,
                         "updatedAt" to now
                     )
+                    
+                    // Add optional fields if provided
+                    if (neuropathicLeg.isNotBlank()) {
+                        data["neuropathicLeg"] = neuropathicLeg
+                    }
+                    if (dateOfLastUlcer.isNotBlank()) {
+                        data["dateOfLastUlcer"] = dateOfLastUlcer
+                    }
+                    if (ulcerActive.isNotBlank()) {
+                        data["ulcerActive"] = ulcerActive
+                    }
+                    
                     docRef.set(data, SetOptions.merge())
                         .addOnSuccessListener { onSuccess() }
                         .addOnFailureListener { e -> onError(e.message ?: "Failed to save patient.") }

@@ -64,25 +64,6 @@ fun PatientCard(
                 color = valueColor
             )
         }
-
-        // Origin of pain
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "Origin of pain: ",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Normal,
-                color = labelColor,
-                modifier = Modifier.wrapContentWidth(Alignment.Start)
-            )
-            Text(
-                text = patient.originOfPain.ifEmpty { "N/A" },
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = valueColor,
-                modifier = Modifier.weight(1f),
-                softWrap = true
-            )
-        }
     }
 }
 

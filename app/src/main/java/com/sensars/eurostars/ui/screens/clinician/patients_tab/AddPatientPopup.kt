@@ -2,11 +2,15 @@ package com.sensars.eurostars.ui.screens.clinician.patients_tab
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.*
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +27,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sensars.eurostars.ui.design.Aquamarine
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPatientPopup(
     isVisible: Boolean,
@@ -36,12 +41,27 @@ fun AddPatientPopup(
         var weight by remember { mutableStateOf("") }
         var age by remember { mutableStateOf("") }
         var height by remember { mutableStateOf("") }
+        var neuropathicLeg by remember { mutableStateOf("") }
+        var dateOfLastUlcer by remember { mutableStateOf("") }
+        var ulcerActive by remember { mutableStateOf("") }
+        
+        // Dropdown states
+        var neuropathicLegExpanded by remember { mutableStateOf(false) }
+        var ulcerActiveExpanded by remember { mutableStateOf(false) }
+        
+        val neuropathicLegOptions = listOf("Right", "Left", "Both")
+        val ulcerActiveOptions = listOf("Yes", "No", "Healed", "N/A")
         
         // Validation: check if all fields are filled and numeric
         val isPatientIdNumeric = patientId.isNotBlank() && patientId.all { it.isDigit() }
         val isWeightNumeric = weight.isNotBlank() && weight.all { it.isDigit() }
         val isAgeNumeric = age.isNotBlank() && age.all { it.isDigit() }
         val isHeightNumeric = height.isNotBlank() && height.all { it.isDigit() }
+        
+        // Date validation: YYYY/MM/DD format or N/A
+        val isDateValid = dateOfLastUlcer.isBlank() || 
+                         dateOfLastUlcer == "N/A" || 
+                         dateOfLastUlcer.matches(Regex("^\\d{4}/\\d{2}/\\d{2}$"))
         
         val isFormValid = isPatientIdNumeric && 
                          isWeightNumeric && 
@@ -58,13 +78,17 @@ fun AddPatientPopup(
             Card(
                 modifier = Modifier
                     .width(600.dp)
+                    .fillMaxHeight(0.9f)
                     .padding(16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
+                    val scrollState = rememberScrollState()
                     Column(
-                        modifier = Modifier.padding(24.dp)
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .verticalScroll(scrollState)
                     ) {
                         // Header with title and close button
                         Row(
@@ -184,6 +208,197 @@ fun AddPatientPopup(
                             )
                         }
 
+                        Spacer(Modifier.height(16.dp))
+
+                        // Neuropathic Leg dropdown
+                        Column {
+                            Text(
+                                text = "Neuropathic Leg",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                ),
+                                color = Color(0xFF2C2C2C)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            ExposedDropdownMenuBox(
+                                expanded = neuropathicLegExpanded,
+                                onExpandedChange = { neuropathicLegExpanded = !neuropathicLegExpanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = neuropathicLeg,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(),
+                                    placeholder = { Text("Select option") },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.clickable { neuropathicLegExpanded = !neuropathicLegExpanded }
+                                        )
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Aquamarine,
+                                        unfocusedBorderColor = Color(0xFFE1E5E9)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = neuropathicLegExpanded,
+                                    onDismissRequest = { neuropathicLegExpanded = false }
+                                ) {
+                                    neuropathicLegOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option) },
+                                            onClick = {
+                                                neuropathicLeg = option
+                                                neuropathicLegExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Date of last Ulcer field with N/A option
+                        Column {
+                            Text(
+                                text = "Date of last Ulcer",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                ),
+                                color = Color(0xFF2C2C2C)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                BasicTextField(
+                                    value = dateOfLastUlcer,
+                                    onValueChange = { newValue ->
+                                        if (newValue == "N/A" || newValue.matches(Regex("^\\d{0,4}(/\\d{0,2}(/\\d{0,2})?)?$")) || newValue.isEmpty()) {
+                                            dateOfLastUlcer = newValue
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 16.sp,
+                                        color = Color(0xFF2C2C2C)
+                                    ),
+                                    cursorBrush = SolidColor(Aquamarine),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    decorationBox = { innerTextField ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(48.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0xFFF8F9FA))
+                                                .border(
+                                                    1.dp,
+                                                    if (dateOfLastUlcer.isNotBlank() && !isDateValid) Color.Red else Color(0xFFE1E5E9),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .padding(horizontal = 12.dp),
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            if (dateOfLastUlcer.isEmpty()) {
+                                                Text(
+                                                    text = "YYYY/MM/DD or N/A",
+                                                    color = Color(0xFF9AA4A7),
+                                                    fontSize = 16.sp
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    }
+                                )
+                                TextButton(
+                                    onClick = { dateOfLastUlcer = if (dateOfLastUlcer == "N/A") "" else "N/A" },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = Aquamarine
+                                    )
+                                ) {
+                                    Text("N/A")
+                                }
+                            }
+                            if (dateOfLastUlcer.isNotBlank() && !isDateValid) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "Format: YYYY/MM/DD or N/A",
+                                    color = Color.Red,
+                                    fontSize = 12.sp,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Ulcer Active dropdown
+                        Column {
+                            Text(
+                                text = "Ulcer active",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                ),
+                                color = Color(0xFF2C2C2C)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            ExposedDropdownMenuBox(
+                                expanded = ulcerActiveExpanded,
+                                onExpandedChange = { ulcerActiveExpanded = !ulcerActiveExpanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = ulcerActive,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(),
+                                    placeholder = { Text("Select option") },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            modifier = Modifier.clickable { ulcerActiveExpanded = !ulcerActiveExpanded }
+                                        )
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Aquamarine,
+                                        unfocusedBorderColor = Color(0xFFE1E5E9)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = ulcerActiveExpanded,
+                                    onDismissRequest = { ulcerActiveExpanded = false }
+                                ) {
+                                    ulcerActiveOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option) },
+                                            onClick = {
+                                                ulcerActive = option
+                                                ulcerActiveExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(32.dp))
 
                         // Error message display
@@ -231,7 +446,10 @@ fun AddPatientPopup(
                                                 id = patientId,
                                                 weight = weight,
                                                 age = age,
-                                                height = height
+                                                height = height,
+                                                neuropathicLeg = neuropathicLeg,
+                                                dateOfLastUlcer = dateOfLastUlcer,
+                                                ulcerActive = ulcerActive
                                             )
                                         )
                                     }
@@ -362,5 +580,8 @@ data class PatientData(
     val id: String,
     val weight: String,
     val age: String,
-    val height: String
+    val height: String,
+    val neuropathicLeg: String = "",
+    val dateOfLastUlcer: String = "",
+    val ulcerActive: String = ""
 )

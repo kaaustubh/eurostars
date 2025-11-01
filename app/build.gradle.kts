@@ -11,18 +11,40 @@ android {
         version = release(36)
     }
 
+    splits {
+        abi { isEnable = false }
+        density { isEnable = false }
+    }
+
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     defaultConfig {
         applicationId = "com.sensars.eurostars"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("EUROSTARS_STORE_FILE") ?: project.properties["EUROSTARS_STORE_FILE"].toString())
+            storePassword = System.getenv("EUROSTARS_STORE_PASSWORD") ?: project.properties["EUROSTARS_STORE_PASSWORD"].toString()
+            keyAlias = System.getenv("EUROSTARS_KEY_ALIAS") ?: project.properties["EUROSTARS_KEY_ALIAS"].toString()
+            keyPassword = System.getenv("EUROSTARS_KEY_PASSWORD") ?: project.properties["EUROSTARS_KEY_PASSWORD"].toString()
+            enableV1Signing = true    // for older devices
+            enableV2Signing = true    // required for modern devices
+        }
+    }
     buildTypes {
         release {
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
