@@ -10,6 +10,7 @@ import com.sensars.eurostars.ui.screens.clinician.ClinicianLoginScreen
 import com.sensars.eurostars.ui.screens.clinician.ClinicianSignupScreen
 import com.sensars.eurostars.ui.screens.clinician.VerifyEmailScreen
 import com.sensars.eurostars.ui.screens.patient.PatientLoginScreen
+import com.sensars.sensole.ui.screens.patient.PatientHomeScreen
 import com.sensars.sensole.ui.screens.clinician.ClinicianHomeScreen
 import com.sensars.eurostars.viewmodel.RoleViewModel
 import com.sensars.eurostars.viewmodel.authViewModel
@@ -113,6 +114,17 @@ fun NavHost(navController: NavHostController) {
                         navController.navigate(Routes.ROLE_SELECT) {
                             popUpTo(Routes.CLINICIAN_HOME) { inclusive = true }
                         }
+                    }
+                }
+            )
+        }
+
+        // Patient home
+        composable(Routes.PATIENT_HOME) {
+            PatientHomeScreen(
+                onLogout = {
+                    navController.navigate(Routes.ROLE_SELECT) {
+                        popUpTo(Routes.PATIENT_HOME) { inclusive = true }
                     }
                 }
             )

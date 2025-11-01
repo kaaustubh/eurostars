@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sensars.eurostars.ui.design.Aquamarine
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +50,13 @@ fun AddPatientPopup(
         // Dropdown states
         var neuropathicLegExpanded by remember { mutableStateOf(false) }
         var ulcerActiveExpanded by remember { mutableStateOf(false) }
+        
+        // Date picker state
+        var showDatePicker by remember { mutableStateOf(false) }
+        var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+        
+        // Format date from LocalDate to YYYY/MM/DD
+        val dateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
         
         val neuropathicLegOptions = listOf("Right", "Left", "Both")
         val ulcerActiveOptions = listOf("Yes", "No", "Healed", "N/A")
@@ -281,56 +290,110 @@ fun AddPatientPopup(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                BasicTextField(
-                                    value = dateOfLastUlcer,
-                                    onValueChange = { newValue ->
-                                        if (newValue == "N/A" || newValue.matches(Regex("^\\d{0,4}(/\\d{0,2}(/\\d{0,2})?)?$")) || newValue.isEmpty()) {
-                                            dateOfLastUlcer = newValue
-                                        }
-                                    },
+                                // Clickable date field that opens calendar
+                                Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(48.dp),
-                                    singleLine = true,
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        .height(48.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF8F9FA))
+                                        .border(
+                                            1.dp,
+                                            if (dateOfLastUlcer.isNotBlank() && !isDateValid) Color.Red else Color(0xFFE1E5E9),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { showDatePicker = true }
+                                        .padding(horizontal = 12.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(
+                                        text = if (dateOfLastUlcer.isEmpty()) "YYYY/MM/DD or N/A" else dateOfLastUlcer,
+                                        color = if (dateOfLastUlcer.isEmpty()) Color(0xFF9AA4A7) else Color(0xFF2C2C2C),
                                         fontSize = 16.sp,
-                                        color = Color(0xFF2C2C2C)
-                                    ),
-                                    cursorBrush = SolidColor(Aquamarine),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    decorationBox = { innerTextField ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(48.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0xFFF8F9FA))
-                                                .border(
-                                                    1.dp,
-                                                    if (dateOfLastUlcer.isNotBlank() && !isDateValid) Color.Red else Color(0xFFE1E5E9),
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(horizontal = 12.dp),
-                                            contentAlignment = Alignment.CenterStart
-                                        ) {
-                                            if (dateOfLastUlcer.isEmpty()) {
-                                                Text(
-                                                    text = "YYYY/MM/DD or N/A",
-                                                    color = Color(0xFF9AA4A7),
-                                                    fontSize = 16.sp
-                                                )
-                                            }
-                                            innerTextField()
-                                        }
-                                    }
-                                )
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
                                 TextButton(
-                                    onClick = { dateOfLastUlcer = if (dateOfLastUlcer == "N/A") "" else "N/A" },
+                                    onClick = { 
+                                        dateOfLastUlcer = if (dateOfLastUlcer == "N/A") "" else "N/A"
+                                        selectedDate = null
+                                    },
                                     colors = ButtonDefaults.textButtonColors(
                                         contentColor = Aquamarine
                                     )
                                 ) {
                                     Text("N/A")
+                                }
+                            }
+                            
+                            // Date Picker Dialog
+                            if (showDatePicker) {
+                                // Calculate today's date
+                                val today = LocalDate.now()
+                                val todayMillis = today.atStartOfDay(java.time.ZoneId.systemDefault())
+                                    .toInstant()
+                                    .toEpochMilli()
+                                
+                                val datePickerState = rememberDatePickerState(
+                                    initialSelectedDateMillis = selectedDate?.let {
+                                        it.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                    },
+                                    yearRange = IntRange(today.year - 100, today.year),
+                                    selectableDates = object : SelectableDates {
+                                        override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                                            val selectedDate = java.time.Instant.ofEpochMilli(utcTimeMillis)
+                                                .atZone(java.time.ZoneId.systemDefault())
+                                                .toLocalDate()
+                                            return !selectedDate.isAfter(today)
+                                        }
+
+                                        override fun isSelectableYear(year: Int): Boolean {
+                                            return year <= today.year
+                                        }
+                                    }
+                                )
+                                
+                                Dialog(
+                                    onDismissRequest = { showDatePicker = false }
+                                ) {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp)
+                                        ) {
+                                            DatePicker(
+                                                state = datePickerState
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                TextButton(
+                                                    onClick = { showDatePicker = false }
+                                                ) {
+                                                    Text("Cancel")
+                                                }
+                                                Spacer(Modifier.width(8.dp))
+                                                TextButton(
+                                                    onClick = {
+                                                        datePickerState.selectedDateMillis?.let { millis ->
+                                                            val instant = java.time.Instant.ofEpochMilli(millis)
+                                                            val date = LocalDate.ofInstant(instant, java.time.ZoneId.systemDefault())
+                                                            selectedDate = date
+                                                            dateOfLastUlcer = date.format(dateFormatter)
+                                                        }
+                                                        showDatePicker = false
+                                                    }
+                                                ) {
+                                                    Text("OK", color = Aquamarine)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             if (dateOfLastUlcer.isNotBlank() && !isDateValid) {
