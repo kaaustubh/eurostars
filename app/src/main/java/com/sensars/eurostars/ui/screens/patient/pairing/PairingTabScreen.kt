@@ -94,6 +94,16 @@ fun PairingTabScreen() {
             )
         }
         
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // About Section with Release Notes
+        var showReleaseNotes by remember { mutableStateOf(false) }
+        com.sensars.eurostars.ui.screens.shared.AboutSection(
+            showReleaseNotes = showReleaseNotes,
+            onShowReleaseNotesChange = { showReleaseNotes = it },
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
+        
         Spacer(modifier = Modifier.height(24.dp))
     }
 }

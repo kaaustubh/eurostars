@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun AboutSection(
     showReleaseNotes: Boolean = false,
-    onShowReleaseNotesChange: (Boolean) -> Unit = {}
+    onShowReleaseNotesChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -31,7 +32,7 @@ fun AboutSection(
     }
     
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
