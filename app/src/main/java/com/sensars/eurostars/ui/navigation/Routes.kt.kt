@@ -7,4 +7,5 @@ object Routes {
     const val VERIFY_EMAIL = "verify_email"
     const val CLINICIAN_HOME = "clinician_home"
     const val PATIENT_HOME = "patient_home"
+    const val PATIENT_PAIRING_ONBOARDING = "patient_pairing_onboarding"
 }

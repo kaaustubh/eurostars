@@ -93,4 +93,6 @@ dependencies {
 
     // Optional window size classes for tablet/phone responsive UI
     implementation("androidx.compose.material3:material3-window-size-class:1.3.0")
+    implementation("androidx.compose.material:material-icons-extended")
+
 }

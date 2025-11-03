@@ -10,7 +10,7 @@ import com.sensars.eurostars.ui.screens.clinician.ClinicianLoginScreen
 import com.sensars.eurostars.ui.screens.clinician.ClinicianSignupScreen
 import com.sensars.eurostars.ui.screens.clinician.VerifyEmailScreen
 import com.sensars.eurostars.ui.screens.patient.PatientLoginScreen
-import com.sensars.sensole.ui.screens.patient.PatientHomeScreen
+import com.sensars.eurostars.ui.screens.patient.PatientHomeScreen
 import com.sensars.sensole.ui.screens.clinician.ClinicianHomeScreen
 import com.sensars.eurostars.viewmodel.RoleViewModel
 import com.sensars.eurostars.viewmodel.authViewModel
@@ -77,8 +77,22 @@ fun NavHost(navController: NavHostController) {
         composable(Routes.PATIENT_LOGIN) {
             PatientLoginScreen(
                 onLoginSuccess = {
-                    navController.navigate(Routes.PATIENT_HOME) {
+                    // Check pairing status - if not paired, show onboarding
+                    // For now, navigate to onboarding. Logic will be added later
+                    navController.navigate(Routes.PATIENT_PAIRING_ONBOARDING) {
                         popUpTo(Routes.PATIENT_LOGIN) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
+        // Patient pairing onboarding
+        composable(Routes.PATIENT_PAIRING_ONBOARDING) {
+            // Import will be added when screen is ready
+            com.sensars.eurostars.ui.screens.patient.pairing.PairingOnboardingRoute(
+                onPairingComplete = {
+                    navController.navigate(Routes.PATIENT_HOME) {
+                        popUpTo(Routes.PATIENT_PAIRING_ONBOARDING) { inclusive = true }
                     }
                 }
             )

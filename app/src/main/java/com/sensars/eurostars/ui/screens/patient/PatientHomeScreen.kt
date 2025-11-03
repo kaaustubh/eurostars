@@ -1,14 +1,15 @@
-package com.sensars.sensole.ui.screens.patient
+package com.sensars.eurostars.ui.screens.patient
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.rememberNavController
+import com.sensars.eurostars.ui.navigation.PatientDashboardNavHost
+import com.sensars.eurostars.ui.screens.patient.dashboard.PatientBottomBar
 import com.sensars.eurostars.viewmodel.patientAuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -16,6 +17,9 @@ import com.sensars.eurostars.viewmodel.patientAuthViewModel
 fun PatientHomeScreen(onLogout: () -> Unit = {}) {
     var showLogoutConfirm by remember { mutableStateOf(false) }
     val vm = patientAuthViewModel()
+    
+    // Child navController for patient dashboard tabs
+    val dashboardNav = rememberNavController()
 
     Scaffold(
         topBar = {
@@ -30,26 +34,13 @@ fun PatientHomeScreen(onLogout: () -> Unit = {}) {
                     }
                 }
             )
+        },
+        bottomBar = {
+            PatientBottomBar(navController = dashboardNav)
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            Text("Patient Dashboard (placeholder)")
-            Spacer(Modifier.height(8.dp))
-            Text("• Pair sensors\n• Walking Mode\n• Session History")
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            var showReleaseNotes by remember { mutableStateOf(false) }
-            com.sensars.eurostars.ui.screens.shared.AboutSection(
-                showReleaseNotes = showReleaseNotes,
-                onShowReleaseNotesChange = { showReleaseNotes = it }
-            )
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            PatientDashboardNavHost(navController = dashboardNav)
         }
 
         // Logout confirmation dialog

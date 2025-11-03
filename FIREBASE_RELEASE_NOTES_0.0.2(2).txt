@@ -1,0 +1,36 @@
+Version 0.0.2(2) - Release Notes
+
+NEW FEATURES:
+
+• Patient Login System
+  - Patients can now log in using their Clinical Study ID
+  - Smart ID matching (e.g., entering "1" matches patient ID "0001")
+  - Patients remain logged in after app restart
+
+• Settings & Release Notes
+  - New Settings screen for clinicians (accessible from tab bar)
+  - In-app release notes viewer with formatted display
+  - View app version and build information
+
+• Calendar Date Picker
+  - Interactive calendar picker for "Date of last Ulcer" field
+  - Prevents selection of future dates
+  - Auto-formats dates to YYYY/MM/DD
+
+• Patient Logout
+  - Logout functionality for patient role
+  - Confirmation dialog before logging out
+
+IMPROVEMENTS:
+
+• Enhanced date input experience with automatic formatting
+• Mobile-optimized patient screens for better usability
+• Improved error messages for better user feedback
+• Release notes now display with proper formatting and are scrollable
+
+TECHNICAL UPDATES:
+
+• Patient authentication and session management system
+• Enhanced navigation and routing
+• Improved data validation and error handling
+
