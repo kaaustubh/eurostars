@@ -19,6 +19,9 @@ class PatientsViewModel(
     private val _patients = MutableStateFlow<List<Patient>>(emptyList())
     val patients = _patients.asStateFlow()
 
+    private val _nextPatientId = MutableStateFlow<String?>(null)
+    val nextPatientId = _nextPatientId.asStateFlow()
+
     init {
         loadPatients()
     }
@@ -30,13 +33,16 @@ class PatientsViewModel(
     fun loadPatients() {
         _loading.value = true
         _error.value = null
+        _nextPatientId.value = null
         repo.getPatients(
             onSuccess = { patients ->
                 _patients.value = patients
+                _nextPatientId.value = calculateNextPatientId(patients)
                 _loading.value = false
             },
             onError = { msg ->
                 _error.value = msg
+                _nextPatientId.value = null
                 _loading.value = false
             }
         )
@@ -83,5 +89,31 @@ class PatientsViewModel(
                 _error.value = msg
             }
         )
+    }
+
+    private fun calculateNextPatientId(patients: List<Patient>): String? {
+        val numericIds = patients.mapNotNull { patient ->
+            val raw = patient.patientId.trim()
+            raw.toLongOrNull()
+                ?: raw.filter { it.isDigit() }.takeIf { it.isNotEmpty() }?.toLongOrNull()
+        }
+
+        val nextNumeric = (numericIds.maxOrNull() ?: 0L) + 1L
+
+        if (patients.isEmpty()) {
+            return nextNumeric.toString().padStart(4, '0')
+        }
+
+        val hasLeadingZeros = patients.any { patient ->
+            val trimmed = patient.patientId.trim()
+            trimmed.length > 1 && trimmed.startsWith('0')
+        }
+
+        return if (hasLeadingZeros) {
+            val width = maxOf(patients.maxOfOrNull { it.patientId.length } ?: 4, 4)
+            nextNumeric.toString().padStart(width, '0')
+        } else {
+            nextNumeric.toString()
+        }
     }
 }

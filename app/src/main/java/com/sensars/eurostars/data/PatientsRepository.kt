@@ -27,40 +27,47 @@ class PatientsRepository {
 
         val docRef = db.collection("patients").document(patientId)
 
-        // Ensure unique patientId by checking existence first
+        val now = Timestamp.now()
+        val data = mutableMapOf(
+            "patientId" to patientId,
+            "clinicianUid" to uid,
+            "weightKg" to weightKg,
+            "ageYears" to ageYears,
+            "heightCm" to heightCm,
+            "updatedAt" to now
+        )
+
+        // Preserve existing createdAt if the document already exists
         docRef.get()
-            .addOnSuccessListener { snap ->
-                if (snap.exists()) {
-                    onError("Patient ID already exists.")
-                } else {
-                    val now = Timestamp.now()
-                    val data = mutableMapOf(
-                        "patientId" to patientId,
-                        "clinicianUid" to uid,
-                        "weightKg" to weightKg,
-                        "ageYears" to ageYears,
-                        "heightCm" to heightCm,
-                        "createdAt" to now,
-                        "updatedAt" to now
-                    )
-                    
-                    // Add optional fields if provided
-                    if (neuropathicLeg.isNotBlank()) {
-                        data["neuropathicLeg"] = neuropathicLeg
-                    }
-                    if (dateOfLastUlcer.isNotBlank()) {
-                        data["dateOfLastUlcer"] = dateOfLastUlcer
-                    }
-                    if (ulcerActive.isNotBlank()) {
-                        data["ulcerActive"] = ulcerActive
-                    }
-                    
-                    docRef.set(data, SetOptions.merge())
-                        .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { e -> onError(e.message ?: "Failed to save patient.") }
+            .addOnSuccessListener { snapshot ->
+                val createdAt = snapshot?.get("createdAt") as? Timestamp ?: now
+                data["createdAt"] = createdAt
+
+                if (neuropathicLeg.isNotBlank()) {
+                    data["neuropathicLeg"] = neuropathicLeg
+                } else if (snapshot?.contains("neuropathicLeg") == true) {
+                    data["neuropathicLeg"] = snapshot.getString("neuropathicLeg") ?: ""
                 }
+
+                if (dateOfLastUlcer.isNotBlank()) {
+                    data["dateOfLastUlcer"] = dateOfLastUlcer
+                } else if (snapshot?.contains("dateOfLastUlcer") == true) {
+                    data["dateOfLastUlcer"] = snapshot.getString("dateOfLastUlcer") ?: ""
+                }
+
+                if (ulcerActive.isNotBlank()) {
+                    data["ulcerActive"] = ulcerActive
+                } else if (snapshot?.contains("ulcerActive") == true) {
+                    data["ulcerActive"] = snapshot.getString("ulcerActive") ?: ""
+                }
+
+                docRef.set(data)
+                    .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { e -> onError(e.message ?: "Failed to save patient.") }
             }
-            .addOnFailureListener { e -> onError(e.message ?: "Failed to check Patient ID.") }
+            .addOnFailureListener { e ->
+                onError(e.message ?: "Failed to prepare patient record.")
+            }
     }
 
     fun getPatients(
