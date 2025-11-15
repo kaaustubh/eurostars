@@ -10,11 +10,18 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 
 data class BleDeviceItem(
     val name: String?,
     val address: String,
     val rssi: Int
+)
+
+data class GattDeviceInfo(
+    val serialNumber: String? = null,
+    val firmwareRevision: String? = null,
+    val batteryLevel: Int? = null
 )
 
 class BleRepository(private val context: Context) {
@@ -43,20 +50,10 @@ class BleRepository(private val context: Context) {
             close(IllegalStateException("Bluetooth is off"))
             return@callbackFlow
         }
-        // Filter by advertised service if available; otherwise filter by name prefix.
-        val advertisedService = BleUuids.ADVERTISED_SERVICE
-        val filters = if (advertisedService != null) {
-            listOf(
-                ScanFilter.Builder()
-                    .setServiceUuid(ParcelUuid(advertisedService))
-                    .build()
-            )
-        } else {
-            emptyList()
-        }
-        val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
+        val filters = listOf(
+            ScanFilter.Builder().setServiceUuid(ParcelUuid(BleUuids.ADVERTISED_SERVICE)).build()
+        )
+        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
 
         val cb = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -85,7 +82,9 @@ class BleRepository(private val context: Context) {
     fun connect(
         address: String,
         onConnected: (BluetoothGatt) -> Unit,
-        onDisconnected: (Throwable?) -> Unit
+        onDisconnected: (Throwable?) -> Unit,
+        onDeviceInfo: ((GattDeviceInfo) -> Unit)? = null,
+        streams: SensorDataStreams? = null
     ) {
         val device = btAdapter?.getRemoteDevice(address)
             ?: run { onDisconnected(IllegalArgumentException("Device not found")); return }
@@ -105,12 +104,81 @@ class BleRepository(private val context: Context) {
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    onConnected(gatt) // you can start enabling notifications here
+                    val info = GattDeviceInfo(
+                        serialNumber = readStringCharacteristic(gatt, BleUuids.DEVICE_INFO_SERVICE, BleUuids.SERIAL_NUMBER_CHAR),
+                        firmwareRevision = readStringCharacteristic(gatt, BleUuids.DEVICE_INFO_SERVICE, BleUuids.FIRMWARE_REVISION_CHAR),
+                        batteryLevel = readBatteryLevel(gatt)
+                    )
+                    onDeviceInfo?.invoke(info)
+                    // Enable notifications for measurement characteristics
+                    SensorGattManager(gatt).enableKnownNotifications()
+                    onConnected(gatt)
                 } else {
                     onDisconnected(IllegalStateException("Service discovery failed: $status"))
                     gatt.close()
                 }
             }
+
+            override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+                val now = System.nanoTime()
+                val uuid = characteristic.uuid
+                val value = characteristic.value ?: return
+                streams ?: return
+                when {
+                    pressureUuidToIndex.containsKey(uuid) -> {
+                        val idx = pressureUuidToIndex[uuid] ?: return
+                        val v = SensorDecoders.decodeUnsignedInt(value)
+                        streams._pressure.tryEmit(PressureSample(idx, v, now))
+                    }
+                    uuid in BleUuids.ACCEL_DATA_CHARS -> {
+                        // Collect samples across 3 chars; emit per-char updates as triplet approx
+                        val component = SensorDecoders.decodeFloat(value)
+                        val x = if (uuid == BleUuids.ACCEL_DATA_CHARS[0]) component else Float.NaN
+                        val y = if (uuid == BleUuids.ACCEL_DATA_CHARS[1]) component else Float.NaN
+                        val z = if (uuid == BleUuids.ACCEL_DATA_CHARS[2]) component else Float.NaN
+                        streams._accel.tryEmit(AccelSample(x, y, z, now))
+                    }
+                    uuid in BleUuids.GYRO_DATA_CHARS -> {
+                        val component = SensorDecoders.decodeFloat(value)
+                        val x = if (uuid == BleUuids.GYRO_DATA_CHARS[0]) component else Float.NaN
+                        val y = if (uuid == BleUuids.GYRO_DATA_CHARS[1]) component else Float.NaN
+                        val z = if (uuid == BleUuids.GYRO_DATA_CHARS[2]) component else Float.NaN
+                        streams._gyro.tryEmit(GyroSample(x, y, z, now))
+                    }
+                    uuid == BleUuids.TEMPERATURE_CHAR -> {
+                        val t = SensorDecoders.decodeFloat(value)
+                        streams._temp.tryEmit(TemperatureSample(t, now))
+                    }
+                    uuid == BleUuids.TIME_CHAR -> {
+                        val ms = SensorDecoders.decodeUnsignedLong(value)
+                        streams._time.tryEmit(DeviceTimeSample(ms, now))
+                    }
+                }
+            }
         })
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun readStringCharacteristic(gatt: BluetoothGatt, serviceUuid: UUID, charUuid: UUID): String? {
+        val service = gatt.getService(serviceUuid) ?: return null
+        val characteristic = service.getCharacteristic(charUuid) ?: return null
+        val readOk = gatt.readCharacteristic(characteristic)
+        if (!readOk) return null
+        // Android will callback onCharacteristicRead synchronously in some stacks after readCharacteristic returns.
+        // But to keep simple in this MVP approach, use the cached value if available.
+        val value = characteristic.value ?: return null
+        return try {
+            String(value, Charsets.UTF_8).trim().ifBlank { null }
+        } catch (_: Exception) { null }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun readBatteryLevel(gatt: BluetoothGatt): Int? {
+        val service = gatt.getService(BleUuids.BATTERY_SERVICE) ?: return null
+        val characteristic = service.getCharacteristic(BleUuids.BATTERY_LEVEL_CHAR) ?: return null
+        val ok = gatt.readCharacteristic(characteristic)
+        if (!ok) return null
+        val v = characteristic.value ?: return null
+        return v.firstOrNull()?.toInt()
     }
 }

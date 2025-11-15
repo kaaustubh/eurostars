@@ -23,8 +23,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,9 +40,18 @@ import androidx.compose.ui.unit.sp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.ButtonDefaults
+import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
 
 @Composable
 fun WalkModeScreen() {
+    val pairingViewModel = bluetoothPairingViewModel()
+    val pairingUiState by pairingViewModel.uiState.collectAsState()
+    val pairingStatus = pairingUiState.pairingStatus
+    
+    val areBothSensorsPaired = pairingStatus.areBothPaired
+    val isLeftPaired = pairingStatus.isLeftPaired
+    val isRightPaired = pairingStatus.isRightPaired
+    
     var showStartDialog by remember { mutableStateOf(false) }
     var isWalkModeActive by remember { mutableStateOf(false) }
     var sessionStart by remember { mutableStateOf<LocalDateTime?>(null) }
@@ -81,6 +91,9 @@ fun WalkModeScreen() {
 
         WalkModeControls(
             isActive = isWalkModeActive,
+            areBothSensorsPaired = areBothSensorsPaired,
+            isLeftPaired = isLeftPaired,
+            isRightPaired = isRightPaired,
             onStartRequested = { showStartDialog = true },
             onStop = {
                 isWalkModeActive = false
@@ -191,6 +204,9 @@ private fun SessionStatusCard(
 @Composable
 private fun WalkModeControls(
     isActive: Boolean,
+    areBothSensorsPaired: Boolean,
+    isLeftPaired: Boolean,
+    isRightPaired: Boolean,
     onStartRequested: () -> Unit,
     onStop: () -> Unit
 ) {
@@ -208,15 +224,36 @@ private fun WalkModeControls(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isActive) "Walk mode is active" else "Ready to start",
+                    text = if (isActive) {
+                        "Walk mode is active"
+                    } else if (areBothSensorsPaired) {
+                        "Ready to start"
+                    } else {
+                        "Sensors not paired"
+                    },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (isActive) {
-                        "Tap Stop when the patient completes the walk. Data streams are buffered locally."
-                    } else {
-                        "Tap Start to begin capturing live pressure data from both sensors."
+                    text = when {
+                        isActive -> {
+                            "Tap Stop when the patient completes the walk. Data streams are buffered locally."
+                        }
+                        areBothSensorsPaired -> {
+                            "Tap Start to begin capturing live pressure data from both sensors."
+                        }
+                        !isLeftPaired && !isRightPaired -> {
+                            "Please pair both left and right foot sensors in the Pairing tab before starting."
+                        }
+                        !isLeftPaired -> {
+                            "Please pair the left foot sensor in the Pairing tab before starting."
+                        }
+                        !isRightPaired -> {
+                            "Please pair the right foot sensor in the Pairing tab before starting."
+                        }
+                        else -> {
+                            "Please pair both sensors in the Pairing tab before starting."
+                        }
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -239,6 +276,7 @@ private fun WalkModeControls(
             } else {
                 Button(
                     onClick = onStartRequested,
+                    enabled = areBothSensorsPaired,
                     modifier = Modifier.clip(RoundedCornerShape(12.dp))
                 ) {
                     Text("Start", fontSize = 16.sp)
