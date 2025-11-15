@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.3(3)] - 2025-11-15
+
+### New Features
+- **Walk Mode UI**: Redesigned Walk Mode screen with start/stop controls, session status tracking, and dual foot heatmap placeholders
+- **Sensor Pairing Validation**: Walk Mode Start button now validates that both left and right foot sensors are paired before allowing session start
+- **BLE Sensor Pairing**: Complete Bluetooth Low Energy (BLE) pairing flow for left and right foot sensors
+  - Device scanning and discovery interface
+  - Connection management with device information retrieval
+  - Persistent pairing storage using DataStore
+  - Pairing status display in Pairing tab
+- **Patient Dashboard Navigation**: Implemented tab-based navigation for patient dashboard (Walk Mode, Gait Analysis, Pairing)
+- **Auto-Generated Patient IDs**: Clinician app now automatically generates sequential patient IDs with leading zeros preserved
+- **Release Notes Display**: Added release notes viewer accessible from patient Pairing tab and clinician settings
+
+### Improvements
+- **Walk Mode UX**: Dynamic status messages indicating which sensors need pairing before starting a session
+- **Pairing Flow**: Streamlined BLE pairing process with prerequisite checks (Bluetooth status, permissions)
+- **Error Handling**: Enhanced Bluetooth error handling with user-friendly messages and settings deep-linking
+- **Patient ID Management**: Automatic patient ID generation prevents manual entry errors and ensures sequential numbering
+- **UI Polish**: Improved spacing, margins, and visual hierarchy across pairing and walk mode screens
+
+### Technical
+- Integrated Firebase Crashlytics for crash reporting and analytics
+- Created BleRepository for abstracted BLE operations (scanning, connecting, permission checks)
+- Implemented PairingRepository for persistent sensor pairing storage
+- Added BluetoothPairingViewModel for managing BLE pairing state and operations
+- Created SensorGattManager for GATT notification setup across all sensor characteristics
+- Added SensorDataStreams for handling real-time sensor data (pressure, accelerometer, gyroscope, temperature, time)
+- Enhanced PatientsViewModel with nextPatientId calculation logic
+- Updated PatientsRepository to support patient ID overwriting for consistency
+- Improved navigation structure with PatientDashboardNavHost for nested tab navigation
+- Set version to 0.0.3(3) with versionCode 3
+
+---
+
 ## [0.0.2(2)] - 2025-11-01
 
 ### New Features
