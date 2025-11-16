@@ -5,6 +5,7 @@ import com.sensars.eurostars.data.PatientsRepository
 import com.sensars.eurostars.data.model.Patient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.sensars.eurostars.ui.screens.clinician.patients_tab.PatientData
 
 class PatientsViewModel(
     private val repo: PatientsRepository = PatientsRepository()
@@ -22,12 +23,20 @@ class PatientsViewModel(
     private val _nextPatientId = MutableStateFlow<String?>(null)
     val nextPatientId = _nextPatientId.asStateFlow()
 
+    // For edit mode prefill
+    private val _editPatientData = MutableStateFlow<PatientData?>(null)
+    val editPatientData = _editPatientData.asStateFlow()
+
     init {
         loadPatients()
     }
 
     fun clearError() {
         _error.value = null
+    }
+
+    fun clearEditPatient() {
+        _editPatientData.value = null
     }
 
     fun loadPatients() {
@@ -44,6 +53,30 @@ class PatientsViewModel(
                 _error.value = msg
                 _nextPatientId.value = null
                 _loading.value = false
+            }
+        )
+    }
+
+    fun loadPatientForEdit(patientId: String) {
+        _loading.value = true
+        _error.value = null
+        repo.getPatientById(
+            patientId = patientId,
+            onSuccess = { full ->
+                _loading.value = false
+                _editPatientData.value = PatientData(
+                    id = full.patientId,
+                    weight = full.weightKg?.toString() ?: "",
+                    age = full.ageYears?.toString() ?: "",
+                    height = full.heightCm?.toString() ?: "",
+                    neuropathicLeg = full.neuropathicLeg ?: "",
+                    dateOfLastUlcer = full.dateOfLastUlcer ?: "",
+                    ulcerActive = full.ulcerActive ?: ""
+                )
+            },
+            onError = { msg ->
+                _loading.value = false
+                _error.value = msg
             }
         )
     }

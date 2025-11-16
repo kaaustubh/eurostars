@@ -6,10 +6,35 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import com.sensars.eurostars.data.model.Patient
+import com.google.firebase.firestore.DocumentSnapshot
 
 class PatientsRepository {
     private val db = Firebase.firestore
     private val auth = FirebaseAuth.getInstance()
+
+    /** Full patient payload used for editing */
+    data class PatientFull(
+        val patientId: String,
+        val weightKg: Int?,
+        val ageYears: Int?,
+        val heightCm: Int?,
+        val neuropathicLeg: String?,
+        val dateOfLastUlcer: String?,
+        val ulcerActive: String?
+    )
+
+    private fun DocumentSnapshot.toPatientFull(): PatientFull? {
+        val pid = getString("patientId") ?: id
+        return PatientFull(
+            patientId = pid,
+            weightKg = (get("weightKg") as? Number)?.toInt(),
+            ageYears = (get("ageYears") as? Number)?.toInt() ?: (get("age") as? Number)?.toInt(),
+            heightCm = (get("heightCm") as? Number)?.toInt(),
+            neuropathicLeg = getString("neuropathicLeg"),
+            dateOfLastUlcer = getString("dateOfLastUlcer"),
+            ulcerActive = getString("ulcerActive")
+        )
+    }
 
     fun createPatient(
         patientId: String,
@@ -67,6 +92,35 @@ class PatientsRepository {
             }
             .addOnFailureListener { e ->
                 onError(e.message ?: "Failed to prepare patient record.")
+            }
+    }
+
+    /** Fetch a single patient by ID with editable fields */
+    fun getPatientById(
+        patientId: String,
+        onSuccess: (PatientFull) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val uid = auth.currentUser?.uid
+            ?: return onError("Not signed in.")
+
+        val docRef = db.collection("patients").document(patientId)
+        docRef.get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot != null && snapshot.exists()) {
+                    val clinicianUid = snapshot.getString("clinicianUid")
+                    if (clinicianUid != uid) {
+                        onError("You don't have access to this patient.")
+                    } else {
+                        val full = snapshot.toPatientFull()
+                        if (full != null) onSuccess(full) else onError("Invalid patient record.")
+                    }
+                } else {
+                    onError("Patient not found.")
+                }
+            }
+            .addOnFailureListener { e ->
+                onError(e.message ?: "Failed to fetch patient.")
             }
     }
 
