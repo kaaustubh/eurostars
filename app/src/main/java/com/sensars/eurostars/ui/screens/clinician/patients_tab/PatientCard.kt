@@ -9,6 +9,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sensars.eurostars.data.model.Patient
@@ -34,20 +38,18 @@ fun PatientCard(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Patient Clinical Study ID#
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "Patient Clinical Study ID#: ",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Normal,
-                color = labelColor
-            )
-            Text(
-                text = patient.patientId,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = valueColor
-            )
-        }
+        Text(
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(color = labelColor, fontSize = 14.sp, fontWeight = FontWeight.Normal)) {
+                    append("Patient Clinical Study ID#: ")
+                }
+                withStyle(SpanStyle(color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)) {
+                    append(patient.patientId)
+                }
+            },
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
 
         // Age
         Row(modifier = Modifier.fillMaxWidth()) {
