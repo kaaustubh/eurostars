@@ -84,12 +84,16 @@ class BleRepository(private val context: Context) {
         onConnected: (BluetoothGatt) -> Unit,
         onDisconnected: (Throwable?) -> Unit,
         onDeviceInfo: ((GattDeviceInfo) -> Unit)? = null,
-        streams: SensorDataStreams? = null
+        streams: SensorDataStreams? = null,
+        sensorSide: com.sensars.eurostars.viewmodel.PairingTarget? = null,
+        dataHandler: SensorDataHandler? = null
     ) {
         val device = btAdapter?.getRemoteDevice(address)
             ?: run { onDisconnected(IllegalArgumentException("Device not found")); return }
 
-        device.connectGatt(context, false, object : BluetoothGattCallback() {
+        // Use autoConnect=true for persistent connections to maintain stability
+        // This helps sensors exit pairing mode by maintaining a stable connection
+        device.connectGatt(context, true, object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     onDisconnected(IllegalStateException("GATT error $status"))
@@ -111,7 +115,9 @@ class BleRepository(private val context: Context) {
                     )
                     onDeviceInfo?.invoke(info)
                     // Enable notifications for measurement characteristics
-                    SensorGattManager(gatt).enableKnownNotifications()
+                    val gattManager = SensorGattManager(gatt)
+                    gattManager.enableKnownNotifications()
+                    
                     onConnected(gatt)
                 } else {
                     onDisconnected(IllegalStateException("Service discovery failed: $status"))
@@ -123,12 +129,30 @@ class BleRepository(private val context: Context) {
                 val now = System.nanoTime()
                 val uuid = characteristic.uuid
                 val value = characteristic.value ?: return
+
+                // Route to SensorDataHandler if available (new architecture)
+                if (sensorSide != null && dataHandler != null && streams != null) {
+                    // Log which characteristic received data
+                    val taxelMap = BleUuids.taxelUuidToIndexMap()
+                    if (taxelMap.containsKey(uuid)) {
+                        val taxelIndex = taxelMap[uuid]
+                        val pressureValue = com.sensars.eurostars.data.ble.SensorDecoders.decodeUnsignedInt(value)
+                        android.util.Log.d("BleRepository", "Received pressure data: UUID=$uuid, Taxel=$taxelIndex, Value=$pressureValue")
+                    }
+                    dataHandler.processCharacteristicUpdate(uuid, value, now, sensorSide, streams)
+                    return
+                }
+
+                // Fallback to old implementation for backward compatibility
                 streams ?: return
+                val taxelMap = BleUuids.taxelUuidToIndexMap()
                 when {
-                    pressureUuidToIndex.containsKey(uuid) -> {
-                        val idx = pressureUuidToIndex[uuid] ?: return
+                    taxelMap.containsKey(uuid) -> {
+                        val idx = taxelMap[uuid] ?: return
                         val v = SensorDecoders.decodeUnsignedInt(value)
-                        streams._pressure.tryEmit(PressureSample(idx, v, now))
+                        // Note: Old code path doesn't have sensorSide, using LEFT_SENSOR as default
+                        // This should only happen during transition period
+                        streams._pressure.tryEmit(PressureSample(idx, v, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
                     }
                     uuid in BleUuids.ACCEL_DATA_CHARS -> {
                         // Collect samples across 3 chars; emit per-char updates as triplet approx
@@ -136,22 +160,22 @@ class BleRepository(private val context: Context) {
                         val x = if (uuid == BleUuids.ACCEL_DATA_CHARS[0]) component else Float.NaN
                         val y = if (uuid == BleUuids.ACCEL_DATA_CHARS[1]) component else Float.NaN
                         val z = if (uuid == BleUuids.ACCEL_DATA_CHARS[2]) component else Float.NaN
-                        streams._accel.tryEmit(AccelSample(x, y, z, now))
+                        streams._accel.tryEmit(AccelSample(x, y, z, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
                     }
                     uuid in BleUuids.GYRO_DATA_CHARS -> {
                         val component = SensorDecoders.decodeFloat(value)
                         val x = if (uuid == BleUuids.GYRO_DATA_CHARS[0]) component else Float.NaN
                         val y = if (uuid == BleUuids.GYRO_DATA_CHARS[1]) component else Float.NaN
                         val z = if (uuid == BleUuids.GYRO_DATA_CHARS[2]) component else Float.NaN
-                        streams._gyro.tryEmit(GyroSample(x, y, z, now))
+                        streams._gyro.tryEmit(GyroSample(x, y, z, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
                     }
                     uuid == BleUuids.TEMPERATURE_CHAR -> {
                         val t = SensorDecoders.decodeFloat(value)
-                        streams._temp.tryEmit(TemperatureSample(t, now))
+                        streams._temp.tryEmit(TemperatureSample(t, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
                     }
                     uuid == BleUuids.TIME_CHAR -> {
                         val ms = SensorDecoders.decodeUnsignedLong(value)
-                        streams._time.tryEmit(DeviceTimeSample(ms, now))
+                        streams._time.tryEmit(DeviceTimeSample(ms, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
                     }
                 }
             }

@@ -14,9 +14,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.sensars.eurostars.EurostarsApp
+import com.sensars.eurostars.data.ble.SensorConnectionManager
 import com.sensars.eurostars.viewmodel.PairingState
 import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun PairingOnboardingRoute(
@@ -24,6 +27,7 @@ fun PairingOnboardingRoute(
 ) {
     val context = LocalContext.current
     val vm = bluetoothPairingViewModel()
+    val connectionManager = (context.applicationContext as EurostarsApp).sensorConnectionManager
 
     val uiState by vm.uiState.collectAsState()
     val pairingStatus = uiState.pairingStatus
@@ -32,6 +36,51 @@ fun PairingOnboardingRoute(
     var showScanScreen by remember { mutableStateOf(false) }
     var currentIssue by remember { mutableStateOf<BluetoothIssue?>(null) }
     var lastErrorMessage by remember { mutableStateOf("") }
+
+    // Monitor connection status
+    val leftConnectionState by connectionManager.leftSensorConnection.collectAsState()
+    val rightConnectionState by connectionManager.rightSensorConnection.collectAsState()
+    
+    // Use effective connection state that accounts for Bluetooth being disabled
+    val leftEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.LEFT_SENSOR)
+    val rightEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.RIGHT_SENSOR)
+    
+    val leftConnected = leftEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    val rightConnected = rightEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    
+    // Monitor data reception
+    var leftDataCount by remember { mutableStateOf(0L) }
+    var rightDataCount by remember { mutableStateOf(0L) }
+    var leftLastDataTime by remember { mutableStateOf<Long?>(null) }
+    var rightLastDataTime by remember { mutableStateOf<Long?>(null) }
+    
+    // Monitor data reception for left sensor
+    LaunchedEffect(leftConnected) {
+        if (leftConnected) {
+            val dataHandler = connectionManager.getDataHandler()
+            dataHandler.getPressureFlow(PairingTarget.LEFT_SENSOR).collect { sample ->
+                leftDataCount++
+                leftLastDataTime = System.currentTimeMillis()
+            }
+        } else {
+            leftDataCount = 0
+            leftLastDataTime = null
+        }
+    }
+    
+    // Monitor data reception for right sensor
+    LaunchedEffect(rightConnected) {
+        if (rightConnected) {
+            val dataHandler = connectionManager.getDataHandler()
+            dataHandler.getPressureFlow(PairingTarget.RIGHT_SENSOR).collect { sample ->
+                rightDataCount++
+                rightLastDataTime = System.currentTimeMillis()
+            }
+        } else {
+            rightDataCount = 0
+            rightLastDataTime = null
+        }
+    }
 
     val leftSensorState = SensorPairingState(
         isPaired = pairingStatus.isLeftPaired,
@@ -111,7 +160,13 @@ fun PairingOnboardingRoute(
             onPairRightSensor = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = false) },
             onPairAnotherLeft = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = true) },
             onPairAnotherRight = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = true) },
-            onGoToHome = onPairingComplete
+            onGoToHome = onPairingComplete,
+            leftConnected = leftConnected,
+            rightConnected = rightConnected,
+            leftDataCount = leftDataCount,
+            rightDataCount = rightDataCount,
+            leftLastDataTime = leftLastDataTime,
+            rightLastDataTime = rightLastDataTime
         )
 
         if (showScanScreen && activeTarget != null) {

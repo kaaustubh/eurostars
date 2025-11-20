@@ -37,7 +37,13 @@ android {
     }
     signingConfigs {
         create("release") {
-            storeFile = file(System.getenv("EUROSTARS_STORE_FILE") ?: project.properties["EUROSTARS_STORE_FILE"].toString())
+            val storeFileEnv = System.getenv("EUROSTARS_STORE_FILE")
+            val storeFileProp = project.properties["EUROSTARS_STORE_FILE"]?.toString()
+            storeFile = when {
+                storeFileEnv != null -> file(storeFileEnv)
+                storeFileProp != null -> file(storeFileProp)
+                else -> file(rootProject.projectDir.resolve("eurostars-release.jks")) // Default to root directory
+            }
             storePassword = System.getenv("EUROSTARS_STORE_PASSWORD") ?: project.properties["EUROSTARS_STORE_PASSWORD"].toString()
             keyAlias = System.getenv("EUROSTARS_KEY_ALIAS") ?: project.properties["EUROSTARS_KEY_ALIAS"].toString()
             keyPassword = System.getenv("EUROSTARS_KEY_PASSWORD") ?: project.properties["EUROSTARS_KEY_PASSWORD"].toString()
@@ -47,16 +53,16 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             manifestPlaceholders["crashlyticsCollectionEnabled"] = "true"
             configure<CrashlyticsExtension> {
-                mappingFileUploadEnabled = true
+                // Disable mapping file upload since minification is disabled
+                mappingFileUploadEnabled = false
                 nativeSymbolUploadEnabled = false
             }
 

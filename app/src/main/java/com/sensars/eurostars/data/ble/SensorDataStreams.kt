@@ -1,17 +1,43 @@
 package com.sensars.eurostars.data.ble
 
+import com.sensars.eurostars.viewmodel.PairingTarget
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
 
-/** Data classes for streamed sensor samples. */
-data class PressureSample(val taxelIndex: Int, val value: Long, val timestampNanos: Long)
-data class AccelSample(val x: Float, val y: Float, val z: Float, val timestampNanos: Long)
-data class GyroSample(val x: Float, val y: Float, val z: Float, val timestampNanos: Long)
-data class TemperatureSample(val celsius: Float, val timestampNanos: Long)
-data class DeviceTimeSample(val millis: Long, val timestampNanos: Long)
+/** Data classes for streamed sensor samples with sensor identification. */
+data class PressureSample(
+    val taxelIndex: Int,
+    val value: Long,
+    val timestampNanos: Long,
+    val sensorSide: PairingTarget
+)
+data class AccelSample(
+    val x: Float,
+    val y: Float,
+    val z: Float,
+    val timestampNanos: Long,
+    val sensorSide: PairingTarget
+)
+data class GyroSample(
+    val x: Float,
+    val y: Float,
+    val z: Float,
+    val timestampNanos: Long,
+    val sensorSide: PairingTarget
+)
+data class TemperatureSample(
+    val celsius: Float,
+    val timestampNanos: Long,
+    val sensorSide: PairingTarget
+)
+data class DeviceTimeSample(
+    val millis: Long,
+    val timestampNanos: Long,
+    val sensorSide: PairingTarget
+)
 
 /** Holds hot streams for all sensor data types. */
 class SensorDataStreams internal constructor() {

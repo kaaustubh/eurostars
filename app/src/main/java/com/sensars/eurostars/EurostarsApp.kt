@@ -6,10 +6,14 @@ import com.google.firebase.BuildConfig
 import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.crashlytics
-
+import com.sensars.eurostars.data.ble.SensorConnectionManager
 import timber.log.Timber
 
 class EurostarsApp : Application() {
+
+    val sensorConnectionManager: SensorConnectionManager by lazy {
+        SensorConnectionManager(this)
+    }
 
     override fun onCreate() {
         super.onCreate()

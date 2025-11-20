@@ -15,8 +15,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 data class SensorPairingState(
     val isPaired: Boolean = false,
@@ -35,6 +37,12 @@ fun PairingOnboardingScreen(
     onPairAnotherLeft: () -> Unit = {},
     onPairAnotherRight: () -> Unit = {},
     onGoToHome: () -> Unit = {},
+    leftConnected: Boolean = false,
+    rightConnected: Boolean = false,
+    leftDataCount: Long = 0,
+    rightDataCount: Long = 0,
+    leftLastDataTime: Long? = null,
+    rightLastDataTime: Long? = null,
     modifier: Modifier = Modifier
 ) {
     var leftExpanded by remember { mutableStateOf(!leftSensorState.isPaired) }
@@ -69,11 +77,15 @@ fun PairingOnboardingScreen(
             onExpandedChange = { leftExpanded = it },
             onPair = onPairLeftSensor,
             onPairAnother = onPairAnotherLeft,
+            showPairAnother = false, // Don't show "Pair another one" for left sensor
+            isConnected = leftConnected,
+            dataSampleCount = leftDataCount,
+            lastDataTime = leftLastDataTime,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Right Foot Sensor Section
         SensorPairingSection(
             title = "Right Foot Sensor",
@@ -82,6 +94,9 @@ fun PairingOnboardingScreen(
             onExpandedChange = { rightExpanded = it },
             onPair = onPairRightSensor,
             onPairAnother = onPairAnotherRight,
+            isConnected = rightConnected,
+            dataSampleCount = rightDataCount,
+            lastDataTime = rightLastDataTime,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
         
@@ -116,6 +131,10 @@ internal fun SensorPairingSection(
     onExpandedChange: (Boolean) -> Unit,
     onPair: () -> Unit,
     onPairAnother: () -> Unit,
+    showPairAnother: Boolean = true,
+    isConnected: Boolean = false,
+    dataSampleCount: Long = 0,
+    lastDataTime: Long? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -140,18 +159,96 @@ internal fun SensorPairingSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    // Show summary info when paired (even when collapsed)
+                    if (state.isPaired) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                state.deviceName?.let { name ->
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                state.batteryLevel?.let { battery ->
+                                    Text(
+                                        text = "🔋 $battery%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            // Data reception status with colored indicator
+                            if (isConnected) {
+                                val timeSinceLastData = lastDataTime?.let { System.currentTimeMillis() - it }
+                                val isReceivingData = timeSinceLastData != null && timeSinceLastData < 5000 // 5 seconds threshold
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Green bullet when receiving data, gray when connected but not receiving
+                                    Text(
+                                        text = if (isReceivingData) "●" else "○",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isReceivingData) 
+                                            Color(0xFF4CAF50) // Green
+                                        else 
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                    Text(
+                                        text = if (isReceivingData) {
+                                            "Receiving data ($dataSampleCount samples)"
+                                        } else {
+                                            "Connected, waiting for data..."
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            } else if (state.isPaired) {
+                                // Red bullet when disconnected
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "●",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error // Red
+                                    )
+                                    Text(
+                                        text = "Not connected",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (state.isPaired) {
+                    if (state.isPaired && showPairAnother) {
                         // Pair another button
                         TextButton(
                             onClick = { onPairAnother() },
@@ -163,7 +260,7 @@ internal fun SensorPairingSection(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                    } else {
+                    } else if (!state.isPaired) {
                         // Pair button
                         Button(
                             onClick = { onPair() },
@@ -209,24 +306,25 @@ internal fun SensorPairingSection(
                         )
                     }
                     
+                    state.batteryLevel?.let { battery ->
+                        SensorDetailRow(
+                            label = "Battery Level",
+                            value = "$battery%",
+                            isHighlighted = true
+                        )
+                    }
+                    
                     state.serialNumber?.let { serial ->
                         SensorDetailRow(
-                            label = "Sensor serial number",
+                            label = "Serial Number",
                             value = serial
                         )
                     }
                     
                     state.firmwareVersion?.let { fw ->
                         SensorDetailRow(
-                            label = "Sensor FW version",
+                            label = "Firmware Version",
                             value = fw
-                        )
-                    }
-                    
-                    state.batteryLevel?.let { battery ->
-                        SensorDetailRow(
-                            label = "Sensor battery status",
-                            value = "$battery%"
                         )
                     }
                 }
@@ -239,6 +337,7 @@ internal fun SensorPairingSection(
 private fun SensorDetailRow(
     label: String,
     value: String,
+    isHighlighted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -254,8 +353,8 @@ private fun SensorDetailRow(
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
+            fontWeight = if (isHighlighted) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
     }
 }
