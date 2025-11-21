@@ -85,6 +85,10 @@ class SensorDataHandler(private val context: Context) {
      * Update taxel values (equivalent to pseudocode updateTaxels function).
      * Maps UUID to taxel index and updates the pressure sample.
      */
+    // Track which taxels have received data per sensor
+    private val leftReceivedTaxels = mutableSetOf<Int>()
+    private val rightReceivedTaxels = mutableSetOf<Int>()
+    
     private fun updateTaxels(
         uuid: UUID,
         value: ByteArray,
@@ -98,9 +102,23 @@ class SensorDataHandler(private val context: Context) {
         streams._pressure.tryEmit(sample)
         // Also emit to unified stream
         unifiedStreams._pressure.tryEmit(sample)
-        // Log for debugging - remove in production
-        android.util.Log.d("SensorDataHandler", "Taxel $taxelIndex: $pressureValue (sensor: $sensorSide)")
+        
+        // Track which taxels have received data per sensor (for debugging if needed)
+        val receivedTaxels = when (sensorSide) {
+            PairingTarget.LEFT_SENSOR -> leftReceivedTaxels
+            PairingTarget.RIGHT_SENSOR -> rightReceivedTaxels
+        }
+        receivedTaxels.add(taxelIndex)
+        
         return true
+    }
+    
+    /**
+     * Reset the received taxels tracking (useful for testing)
+     */
+    fun resetTaxelTracking() {
+        leftReceivedTaxels.clear()
+        rightReceivedTaxels.clear()
     }
 
     /**

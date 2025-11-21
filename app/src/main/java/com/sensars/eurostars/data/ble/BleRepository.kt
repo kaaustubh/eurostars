@@ -108,6 +108,11 @@ class BleRepository(private val context: Context) {
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
+                    val pressureService = gatt.getService(BleUuids.PRESSURE_SERVICE)
+                    if (pressureService == null) {
+                        android.util.Log.w("BleRepository", "Pressure service (0x183B) NOT FOUND!")
+                    }
+                    
                     val info = GattDeviceInfo(
                         serialNumber = readStringCharacteristic(gatt, BleUuids.DEVICE_INFO_SERVICE, BleUuids.SERIAL_NUMBER_CHAR),
                         firmwareRevision = readStringCharacteristic(gatt, BleUuids.DEVICE_INFO_SERVICE, BleUuids.FIRMWARE_REVISION_CHAR),
@@ -116,12 +121,32 @@ class BleRepository(private val context: Context) {
                     onDeviceInfo?.invoke(info)
                     // Enable notifications for measurement characteristics
                     val gattManager = SensorGattManager(gatt)
+                    gattManagerRef = gattManager // Store reference for descriptor write callbacks
                     gattManager.enableKnownNotifications()
                     
                     onConnected(gatt)
                 } else {
                     onDisconnected(IllegalStateException("Service discovery failed: $status"))
                     gatt.close()
+                }
+            }
+
+            private var gattManagerRef: SensorGattManager? = null
+            
+            override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+                val success = status == BluetoothGatt.GATT_SUCCESS
+                if (!success) {
+                    val charUuid = descriptor.characteristic.uuid
+                    android.util.Log.w("BleRepository", "Descriptor write failed for characteristic: $charUuid, status: $status")
+                }
+                
+                // Notify SensorGattManager about the completion
+                gattManagerRef?.onDescriptorWriteComplete(descriptor, success)
+            }
+
+            override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    android.util.Log.w("BleRepository", "Characteristic read failed: ${characteristic.uuid}, status: $status")
                 }
             }
 
@@ -132,13 +157,6 @@ class BleRepository(private val context: Context) {
 
                 // Route to SensorDataHandler if available (new architecture)
                 if (sensorSide != null && dataHandler != null && streams != null) {
-                    // Log which characteristic received data
-                    val taxelMap = BleUuids.taxelUuidToIndexMap()
-                    if (taxelMap.containsKey(uuid)) {
-                        val taxelIndex = taxelMap[uuid]
-                        val pressureValue = com.sensars.eurostars.data.ble.SensorDecoders.decodeUnsignedInt(value)
-                        android.util.Log.d("BleRepository", "Received pressure data: UUID=$uuid, Taxel=$taxelIndex, Value=$pressureValue")
-                    }
                     dataHandler.processCharacteristicUpdate(uuid, value, now, sensorSide, streams)
                     return
                 }
