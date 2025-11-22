@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.4(4)] - 2025-11-21
+
+### New Features
+- **Auto-Reconnect Sensors**: Sensors automatically reconnect on app restart if pairing information exists
+  - Automatically attempts to reconnect to previously paired sensors when app launches
+  - Works seamlessly in the background without user intervention
+  - Handles cases where sensors are temporarily unavailable (off, out of range) gracefully
+
+### Improvements
+- **Real-Time Connection Status Updates**: Pairing tab now automatically updates when sensors disconnect or reconnect
+  - UI reflects connection status changes immediately without requiring tab switching
+  - Connection state updates in real-time when sensors are switched off, disconnected, or go out of range
+  - Bluetooth state monitoring ensures accurate connection status display
+- **All 18 Taxels Data Reception**: Fixed issue where only taxel 0 was receiving data
+  - Implemented sequential descriptor write queue to properly enable notifications for all 18 pressure taxels
+  - All taxels now successfully receive data when pressure is applied
+  - Improved BLE notification enablement reliability with proper callback coordination
+- **Reduced Log Noise**: Removed verbose logging for cleaner development experience
+  - Removed service discovery logs, descriptor write success logs, and data reception logs
+  - Kept only essential error and warning logs for debugging
+  - Significantly reduced log output while maintaining error visibility
+
+### Technical
+- Added disconnection handler registration system for GATT connections
+- Implemented sequential descriptor write queue with callback-based processing
+- Enhanced SensorConnectionManager with disconnection handler management
+- Improved BleRepository to notify SensorConnectionManager about disconnections
+- Fixed UI observation to properly recompose when connection states change
+- Added periodic Bluetooth state checking to trigger UI updates
+- Improved connection state management for both pairing and auto-reconnect flows
+- Set version to 0.0.4(4) with versionCode 4
+
+---
+
 ## [0.0.3(3)] - 2025-11-15
 
 ### New Features

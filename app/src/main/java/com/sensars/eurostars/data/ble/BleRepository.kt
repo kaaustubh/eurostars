@@ -102,7 +102,18 @@ class BleRepository(private val context: Context) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     gatt.discoverServices()
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    onDisconnected(null); gatt.close()
+                    // Notify SensorConnectionManager if this connection was registered
+                    // This handles disconnections for connections established during pairing
+                    if (sensorSide != null && dataHandler != null) {
+                        val connectionManager = (context.applicationContext as? com.sensars.eurostars.EurostarsApp)?.sensorConnectionManager
+                        connectionManager?.let { manager ->
+                            // Check if there's a registered handler for this GATT
+                            val handler = manager.getDisconnectionHandler(gatt)
+                            handler?.invoke(device.address, sensorSide)
+                        }
+                    }
+                    onDisconnected(null)
+                    gatt.close()
                 }
             }
 

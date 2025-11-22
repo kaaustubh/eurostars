@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 enum class PairingTarget {
@@ -57,6 +58,67 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
         viewModelScope.launch {
             pairingRepo.pairingStatusFlow.collect { status ->
                 _uiState.value = _uiState.value.copy(pairingStatus = status)
+            }
+        }
+        
+        // Attempt auto-reconnect when ViewModel is created (app restart)
+        viewModelScope.launch {
+            // Wait a bit for the app to fully initialize
+            kotlinx.coroutines.delay(500)
+            autoReconnectSensors()
+        }
+    }
+    
+    /**
+     * Automatically reconnect to sensors if pairing information exists and sensors are not already connected.
+     * This is called on app startup to restore connections after app restart.
+     * Can also be called manually to attempt reconnection.
+     */
+    fun autoReconnectSensors() {
+        viewModelScope.launch {
+            // Check prerequisites
+            if (!bleRepository.hasConnectPermission()) {
+                return@launch
+            }
+            if (!bleRepository.isBluetoothEnabled()) {
+                return@launch
+            }
+            
+            // Get current pairing status
+            val pairingStatus = pairingRepo.pairingStatusFlow.first()
+            
+            // Check left sensor
+            if (pairingStatus.isLeftPaired) {
+                val leftDeviceId = pairingStatus.leftSensor.deviceId
+                if (leftDeviceId != null) {
+                    val leftConnected = connectionManager.isSensorConnected(PairingTarget.LEFT_SENSOR)
+                    if (!leftConnected) {
+                        // Attempt to reconnect
+                        try {
+                            connectionManager.connectSensor(leftDeviceId, PairingTarget.LEFT_SENSOR)
+                        } catch (e: Exception) {
+                            // Connection failed - sensor might be off or out of range
+                            // This is expected and not an error
+                        }
+                    }
+                }
+            }
+            
+            // Check right sensor
+            if (pairingStatus.isRightPaired) {
+                val rightDeviceId = pairingStatus.rightSensor.deviceId
+                if (rightDeviceId != null) {
+                    val rightConnected = connectionManager.isSensorConnected(PairingTarget.RIGHT_SENSOR)
+                    if (!rightConnected) {
+                        // Attempt to reconnect
+                        try {
+                            connectionManager.connectSensor(rightDeviceId, PairingTarget.RIGHT_SENSOR)
+                        } catch (e: Exception) {
+                            // Connection failed - sensor might be off or out of range
+                            // This is expected and not an error
+                        }
+                    }
+                }
             }
         }
     }

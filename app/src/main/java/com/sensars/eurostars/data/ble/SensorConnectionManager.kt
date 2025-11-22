@@ -113,6 +113,29 @@ class SensorConnectionManager(private val context: Context) {
         disconnectAll()
     }
 
+    // Map to store disconnection handlers for GATT connections
+    private val gattDisconnectionHandlers = mutableMapOf<android.bluetooth.BluetoothGatt, (String, PairingTarget) -> Unit>()
+    
+    /**
+     * Register a disconnection handler for a GATT connection.
+     * This allows BleRepository to notify SensorConnectionManager about disconnections
+     * even for connections established during pairing.
+     */
+    fun registerDisconnectionHandler(gatt: android.bluetooth.BluetoothGatt, address: String, sensorSide: PairingTarget) {
+        gattDisconnectionHandlers[gatt] = { addr, side ->
+            if (addr == address && side == sensorSide) {
+                handleDisconnection(address, sensorSide)
+            }
+        }
+    }
+    
+    /**
+     * Unregister a disconnection handler for a GATT connection.
+     */
+    fun unregisterDisconnectionHandler(gatt: android.bluetooth.BluetoothGatt) {
+        gattDisconnectionHandlers.remove(gatt)
+    }
+    
     /**
      * Accept an existing GATT connection and transfer it to this manager.
      * Used when pairing to reuse the connection established during pairing.
@@ -133,10 +156,13 @@ class SensorConnectionManager(private val context: Context) {
         // Register streams with data handler (streams are already set up in BleRepository)
         dataHandler.registerSensor(sensorSide, streams)
         
+        // Register disconnection handler so we can be notified when this connection disconnects
+        registerDisconnectionHandler(gatt, address, sensorSide)
+        
         // The GATT connection is already established, notifications are enabled,
         // and the callback is routing to SensorDataHandler via BleRepository
-        // Note: Disconnections will be detected by the GATT callback in BleRepository
-        // and should update the connection state. We also monitor the connection state here.
+        // Disconnections will be detected by the GATT callback in BleRepository
+        // and will call the registered handler to update connection state.
     }
     
     /**
@@ -203,6 +229,8 @@ class SensorConnectionManager(private val context: Context) {
                 }
                 // Register streams with data handler
                 dataHandler.registerSensor(sensorSide, streams)
+                // Register disconnection handler
+                registerDisconnectionHandler(gatt, address, sensorSide)
             },
             onDisconnected = { throwable ->
                 handleDisconnection(address, sensorSide)
@@ -239,6 +267,7 @@ class SensorConnectionManager(private val context: Context) {
         // Then disconnect and close GATT
         connection?.gatt?.let { gatt ->
             try {
+                unregisterDisconnectionHandler(gatt)
                 gatt.disconnect()
                 gatt.close()
             } catch (e: Exception) {
@@ -302,6 +331,14 @@ class SensorConnectionManager(private val context: Context) {
             PairingTarget.LEFT_SENSOR -> _leftSensorConnection.value?.gatt
             PairingTarget.RIGHT_SENSOR -> _rightSensorConnection.value?.gatt
         }
+    }
+    
+    /**
+     * Get the disconnection handler for a GATT connection.
+     * Used by BleRepository to notify about disconnections.
+     */
+    fun getDisconnectionHandler(gatt: android.bluetooth.BluetoothGatt): ((String, PairingTarget) -> Unit)? {
+        return gattDisconnectionHandlers[gatt]
     }
 
     /**

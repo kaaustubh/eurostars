@@ -66,12 +66,43 @@ fun PairingTabScreen() {
     val leftConnectionState by connectionManager.leftSensorConnection.collectAsState()
     val rightConnectionState by connectionManager.rightSensorConnection.collectAsState()
     
-    // Use effective connection state that accounts for Bluetooth being disabled
-    val leftEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.LEFT_SENSOR)
-    val rightEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.RIGHT_SENSOR)
+    // Periodically check Bluetooth state to trigger UI updates
+    val bleRepository = remember { BleRepository(context) }
+    var isBluetoothEnabled by remember { mutableStateOf(bleRepository.isBluetoothEnabled()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(500) // Check every 500ms
+            val newState = bleRepository.isBluetoothEnabled()
+            if (newState != isBluetoothEnabled) {
+                isBluetoothEnabled = newState
+                // If Bluetooth was disabled, update connection manager
+                if (!newState) {
+                    connectionManager.handleBluetoothDisabled()
+                }
+            }
+        }
+    }
+    
+    // Compute effective connection state that accounts for Bluetooth being disabled
+    val leftEffectiveState = if (!isBluetoothEnabled) {
+        com.sensars.eurostars.data.ble.SensorConnectionState.DISCONNECTED
+    } else {
+        leftConnectionState?.state ?: com.sensars.eurostars.data.ble.SensorConnectionState.IDLE
+    }
+    
+    val rightEffectiveState = if (!isBluetoothEnabled) {
+        com.sensars.eurostars.data.ble.SensorConnectionState.DISCONNECTED
+    } else {
+        rightConnectionState?.state ?: com.sensars.eurostars.data.ble.SensorConnectionState.IDLE
+    }
     
     val leftConnected = leftEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
     val rightConnected = rightEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    
+    // Attempt auto-reconnect when screen is shown (in case ViewModel init already ran)
+    LaunchedEffect(Unit) {
+        vm.autoReconnectSensors()
+    }
     
     // Monitor data reception for left sensor
     LaunchedEffect(leftConnected) {
@@ -120,24 +151,6 @@ fun PairingTabScreen() {
     // State for expand/collapse
     var leftExpanded by remember { mutableStateOf(!pairingStatus.isLeftPaired) }
     var rightExpanded by remember { mutableStateOf(!pairingStatus.isRightPaired) }
-    
-    // Periodically check Bluetooth state to ensure UI reflects actual connection status
-    // This is a backup in case the BroadcastReceiver doesn't fire immediately
-    val bleRepository = remember { BleRepository(context) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(1000) // Check every second
-            // If Bluetooth is off but connection state says connected, update it
-            if (!bleRepository.isBluetoothEnabled()) {
-                val leftState = leftConnectionState?.state
-                val rightState = rightConnectionState?.state
-                if (leftState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED ||
-                    rightState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED) {
-                    connectionManager.handleBluetoothDisabled()
-                }
-            }
-        }
-    }
     
     // Update expanded state when pairing status changes
     LaunchedEffect(pairingStatus.isLeftPaired) {
