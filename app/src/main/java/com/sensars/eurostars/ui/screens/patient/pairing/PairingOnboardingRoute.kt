@@ -5,6 +5,12 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -14,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import com.sensars.eurostars.EurostarsApp
 import com.sensars.eurostars.data.SessionRepository
 import com.sensars.eurostars.data.ble.SensorConnectionManager
@@ -44,6 +51,8 @@ fun PairingOnboardingRoute(
     var showScanScreen by remember { mutableStateOf(false) }
     var currentIssue by remember { mutableStateOf<BluetoothIssue?>(null) }
     var lastErrorMessage by remember { mutableStateOf("") }
+    var showUnpairLeftDialog by remember { mutableStateOf(false) }
+    var showUnpairRightDialog by remember { mutableStateOf(false) }
 
     // Monitor connection status
     val leftConnectionState by connectionManager.leftSensorConnection.collectAsState()
@@ -176,6 +185,8 @@ fun PairingOnboardingRoute(
             onPairRightSensor = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = false) },
             onPairAnotherLeft = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = true) },
             onPairAnotherRight = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = true) },
+            onUnpairLeft = if (leftSensorState.isPaired) { { showUnpairLeftDialog = true } } else null,
+            onUnpairRight = if (rightSensorState.isPaired) { { showUnpairRightDialog = true } } else null,
             onGoToHome = onPairingComplete,
             leftConnected = leftConnected,
             rightConnected = rightConnected,
@@ -257,6 +268,86 @@ fun PairingOnboardingRoute(
                     onBack = { closePairingFlow() }
                 )
             }
+        }
+        
+        // Unpair Left Sensor Confirmation Dialog
+        if (showUnpairLeftDialog) {
+            AlertDialog(
+                onDismissRequest = { showUnpairLeftDialog = false },
+                title = {
+                    Text(
+                        text = "Unpair Left Foot Sensor",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Are you sure you want to unpair the left foot sensor? This will disconnect the sensor.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            vm.clearPairing(PairingTarget.LEFT_SENSOR)
+                            showUnpairLeftDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Unpair")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showUnpairLeftDialog = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+        
+        // Unpair Right Sensor Confirmation Dialog
+        if (showUnpairRightDialog) {
+            AlertDialog(
+                onDismissRequest = { showUnpairRightDialog = false },
+                title = {
+                    Text(
+                        text = "Unpair Right Foot Sensor",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Are you sure you want to unpair the right foot sensor? This will disconnect the sensor.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            vm.clearPairing(PairingTarget.RIGHT_SENSOR)
+                            showUnpairRightDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Unpair")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showUnpairRightDialog = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }

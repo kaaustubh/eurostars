@@ -36,6 +36,8 @@ fun PairingOnboardingScreen(
     onPairRightSensor: () -> Unit = {},
     onPairAnotherLeft: () -> Unit = {},
     onPairAnotherRight: () -> Unit = {},
+    onUnpairLeft: (() -> Unit)? = null,
+    onUnpairRight: (() -> Unit)? = null,
     onGoToHome: () -> Unit = {},
     leftConnected: Boolean = false,
     rightConnected: Boolean = false,
@@ -86,6 +88,7 @@ fun PairingOnboardingScreen(
                 onExpandedChange = { leftExpanded = it },
                 onPair = onPairLeftSensor,
                 onPairAnother = onPairAnotherLeft,
+                onUnpair = onUnpairLeft,
                 showPairAnother = false, // Don't show "Pair another one" for left sensor
                 isConnected = leftConnected,
                 dataSampleCount = leftDataCount,
@@ -105,6 +108,7 @@ fun PairingOnboardingScreen(
                 onExpandedChange = { rightExpanded = it },
                 onPair = onPairRightSensor,
                 onPairAnother = onPairAnotherRight,
+                onUnpair = onUnpairRight,
                 isConnected = rightConnected,
                 dataSampleCount = rightDataCount,
                 lastDataTime = rightLastDataTime,
@@ -145,6 +149,7 @@ internal fun SensorPairingSection(
     onExpandedChange: (Boolean) -> Unit,
     onPair: () -> Unit,
     onPairAnother: () -> Unit,
+    onUnpair: (() -> Unit)? = null,
     showPairAnother: Boolean = true,
     isConnected: Boolean = false,
     dataSampleCount: Long = 0,
@@ -340,6 +345,24 @@ internal fun SensorPairingSection(
                             label = "Firmware Version",
                             value = fw
                         )
+                    }
+                    
+                    // Unpair button
+                    if (onUnpair != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onUnpair,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text(
+                                text = "Unpair",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
