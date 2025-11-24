@@ -213,6 +213,38 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
                     }
                 }
             },
+            onRssiRead = { rssi ->
+                // Update RSSI in pairing repository
+                viewModelScope.launch {
+                    val currentStatus = pairingRepo.pairingStatusFlow.first()
+                    when (target) {
+                        PairingTarget.LEFT_SENSOR -> {
+                            if (currentStatus.isLeftPaired && currentStatus.leftSensor.deviceId == device.address) {
+                                pairingRepo.setLeftSensor(
+                                    currentStatus.leftSensor.deviceId ?: return@launch,
+                                    currentStatus.leftSensor.deviceName,
+                                    currentStatus.leftSensor.serialNumber,
+                                    currentStatus.leftSensor.firmwareVersion,
+                                    currentStatus.leftSensor.batteryLevel,
+                                    rssi
+                                )
+                            }
+                        }
+                        PairingTarget.RIGHT_SENSOR -> {
+                            if (currentStatus.isRightPaired && currentStatus.rightSensor.deviceId == device.address) {
+                                pairingRepo.setRightSensor(
+                                    currentStatus.rightSensor.deviceId ?: return@launch,
+                                    currentStatus.rightSensor.deviceName,
+                                    currentStatus.rightSensor.serialNumber,
+                                    currentStatus.rightSensor.firmwareVersion,
+                                    currentStatus.rightSensor.batteryLevel,
+                                    rssi
+                                )
+                            }
+                        }
+                    }
+                }
+            },
             onDisconnected = { throwable ->
                 viewModelScope.launch {
                     // Update SensorConnectionManager when disconnection is detected

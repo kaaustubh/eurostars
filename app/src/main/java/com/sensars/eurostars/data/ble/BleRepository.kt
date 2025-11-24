@@ -84,6 +84,7 @@ class BleRepository(private val context: Context) {
         onConnected: (BluetoothGatt) -> Unit,
         onDisconnected: (Throwable?) -> Unit,
         onDeviceInfo: ((GattDeviceInfo) -> Unit)? = null,
+        onRssiRead: ((Int) -> Unit)? = null,
         streams: SensorDataStreams? = null,
         sensorSide: com.sensars.eurostars.viewmodel.PairingTarget? = null,
         dataHandler: SensorDataHandler? = null
@@ -100,6 +101,12 @@ class BleRepository(private val context: Context) {
                     gatt.close(); return
                 }
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    // Read RSSI when connected
+                    try {
+                        gatt.readRemoteRssi()
+                    } catch (e: Exception) {
+                        android.util.Log.w("BleRepository", "Failed to read RSSI: ${e.message}")
+                    }
                     gatt.discoverServices()
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     // Notify SensorConnectionManager if this connection was registered
@@ -158,6 +165,22 @@ class BleRepository(private val context: Context) {
             override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     android.util.Log.w("BleRepository", "Characteristic read failed: ${characteristic.uuid}, status: $status")
+                }
+            }
+            
+            override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    // First try the callback passed to connect()
+                    onRssiRead?.invoke(rssi)
+                    
+                    // Also try SensorConnectionManager's RSSI handler (for existing connections)
+                    if (sensorSide != null && dataHandler != null) {
+                        val connectionManager = (context.applicationContext as? com.sensars.eurostars.EurostarsApp)?.sensorConnectionManager
+                        connectionManager?.let { manager ->
+                            val handler = manager.getRssiHandler(gatt)
+                            handler?.invoke(rssi)
+                        }
+                    }
                 }
             }
 

@@ -13,6 +13,8 @@ import com.sensars.eurostars.viewmodel.PairingTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 enum class SensorConnectionState {
     IDLE,
@@ -116,6 +118,9 @@ class SensorConnectionManager(private val context: Context) {
     // Map to store disconnection handlers for GATT connections
     private val gattDisconnectionHandlers = mutableMapOf<android.bluetooth.BluetoothGatt, (String, PairingTarget) -> Unit>()
     
+    // Map to store RSSI update handlers for GATT connections
+    private val gattRssiHandlers = mutableMapOf<android.bluetooth.BluetoothGatt, (Int) -> Unit>()
+    
     /**
      * Register a disconnection handler for a GATT connection.
      * This allows BleRepository to notify SensorConnectionManager about disconnections
@@ -158,6 +163,24 @@ class SensorConnectionManager(private val context: Context) {
         
         // Register disconnection handler so we can be notified when this connection disconnects
         registerDisconnectionHandler(gatt, address, sensorSide)
+        
+        // Register RSSI handler
+        registerRssiHandler(gatt, address, sensorSide)
+        
+        // Read RSSI after connection is established and periodically
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            kotlinx.coroutines.delay(500) // Wait a bit for connection to stabilize
+            // Read RSSI periodically (every 5 seconds) while connected
+            while (isSensorConnected(sensorSide)) {
+                try {
+                    gatt.readRemoteRssi()
+                    kotlinx.coroutines.delay(5000) // Read every 5 seconds
+                } catch (e: Exception) {
+                    android.util.Log.w("SensorConnectionManager", "Failed to read RSSI: ${e.message}")
+                    break
+                }
+            }
+        }
         
         // The GATT connection is already established, notifications are enabled,
         // and the callback is routing to SensorDataHandler via BleRepository
@@ -219,6 +242,7 @@ class SensorConnectionManager(private val context: Context) {
         val streams = SensorDataStreams()
 
         // Connect via BleRepository
+        val pairingRepo = com.sensars.eurostars.data.PairingRepository(context)
         bleRepository.connect(
             address = address,
             onConnected = { gatt ->
@@ -231,6 +255,24 @@ class SensorConnectionManager(private val context: Context) {
                 dataHandler.registerSensor(sensorSide, streams)
                 // Register disconnection handler
                 registerDisconnectionHandler(gatt, address, sensorSide)
+                // Register RSSI handler
+                registerRssiHandler(gatt, address, sensorSide)
+                
+                // Read RSSI after connection and periodically
+                val pairingRepo = com.sensars.eurostars.data.PairingRepository(context)
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    kotlinx.coroutines.delay(500) // Wait a bit for connection to stabilize
+                    // Read RSSI periodically (every 5 seconds) while connected
+                    while (isSensorConnected(sensorSide)) {
+                        try {
+                            gatt.readRemoteRssi()
+                            kotlinx.coroutines.delay(5000) // Read every 5 seconds
+                        } catch (e: Exception) {
+                            android.util.Log.w("SensorConnectionManager", "Failed to read RSSI: ${e.message}")
+                            break
+                        }
+                    }
+                }
             },
             onDisconnected = { throwable ->
                 handleDisconnection(address, sensorSide)
@@ -238,6 +280,15 @@ class SensorConnectionManager(private val context: Context) {
                 // TODO: Implement reconnection logic with exponential backoff
             },
             onDeviceInfo = null,
+            onRssiRead = { rssi ->
+                // Use the registered RSSI handler if available
+                // Get GATT instance using sensorSide since gatt is not in scope here
+                val gatt = getGatt(sensorSide)
+                if (gatt != null) {
+                    val handler = getRssiHandler(gatt)
+                    handler?.invoke(rssi)
+                }
+            },
             streams = streams,
             sensorSide = sensorSide,
             dataHandler = dataHandler
@@ -268,6 +319,7 @@ class SensorConnectionManager(private val context: Context) {
         connection?.gatt?.let { gatt ->
             try {
                 unregisterDisconnectionHandler(gatt)
+                unregisterRssiHandler(gatt)
                 gatt.disconnect()
                 gatt.close()
             } catch (e: Exception) {
@@ -357,6 +409,61 @@ class SensorConnectionManager(private val context: Context) {
      */
     fun getDisconnectionHandler(gatt: android.bluetooth.BluetoothGatt): ((String, PairingTarget) -> Unit)? {
         return gattDisconnectionHandlers[gatt]
+    }
+    
+    /**
+     * Register an RSSI update handler for a GATT connection.
+     * Used to update RSSI when it's read from a connected device.
+     */
+    fun registerRssiHandler(gatt: android.bluetooth.BluetoothGatt, address: String, sensorSide: PairingTarget) {
+        val pairingRepo = com.sensars.eurostars.data.PairingRepository(context)
+        gattRssiHandlers[gatt] = { rssi ->
+            // Update RSSI in pairing repository
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val currentStatus = pairingRepo.pairingStatusFlow.first()
+                when (sensorSide) {
+                    PairingTarget.LEFT_SENSOR -> {
+                        if (currentStatus.isLeftPaired && currentStatus.leftSensor.deviceId == address) {
+                            pairingRepo.setLeftSensor(
+                                currentStatus.leftSensor.deviceId ?: return@launch,
+                                currentStatus.leftSensor.deviceName,
+                                currentStatus.leftSensor.serialNumber,
+                                currentStatus.leftSensor.firmwareVersion,
+                                currentStatus.leftSensor.batteryLevel,
+                                rssi
+                            )
+                        }
+                    }
+                    PairingTarget.RIGHT_SENSOR -> {
+                        if (currentStatus.isRightPaired && currentStatus.rightSensor.deviceId == address) {
+                            pairingRepo.setRightSensor(
+                                currentStatus.rightSensor.deviceId ?: return@launch,
+                                currentStatus.rightSensor.deviceName,
+                                currentStatus.rightSensor.serialNumber,
+                                currentStatus.rightSensor.firmwareVersion,
+                                currentStatus.rightSensor.batteryLevel,
+                                rssi
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get the RSSI handler for a GATT connection.
+     * Used by BleRepository to notify about RSSI updates.
+     */
+    fun getRssiHandler(gatt: android.bluetooth.BluetoothGatt): ((Int) -> Unit)? {
+        return gattRssiHandlers[gatt]
+    }
+    
+    /**
+     * Unregister an RSSI handler for a GATT connection.
+     */
+    fun unregisterRssiHandler(gatt: android.bluetooth.BluetoothGatt) {
+        gattRssiHandlers.remove(gatt)
     }
 
     /**
