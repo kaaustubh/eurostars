@@ -63,6 +63,7 @@ internal fun PairingScanScreen(
     target: PairingTarget,
     devices: List<BleDeviceItem>,
     pairingState: PairingState,
+    pairingStatus: com.sensars.eurostars.data.PairingStatus? = null,
     onDeviceSelected: (BleDeviceItem) -> Unit,
     onBack: () -> Unit,
     onRetry: () -> Unit,
@@ -147,10 +148,25 @@ internal fun PairingScanScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(devices, key = { it.address }) { device ->
+                        // Check if this device is already paired to the opposite foot
+                        val isAlreadyPaired = pairingStatus?.let { status ->
+                            when (target) {
+                                PairingTarget.LEFT_SENSOR -> {
+                                    // If pairing left, check if device is already paired to right
+                                    status.rightSensor.deviceId == device.address
+                                }
+                                PairingTarget.RIGHT_SENSOR -> {
+                                    // If pairing right, check if device is already paired to left
+                                    status.leftSensor.deviceId == device.address
+                                }
+                            }
+                        } ?: false
+                        
                         DeviceRow(
                             device = device,
                             onConnect = { onDeviceSelected(device) },
-                            connecting = isConnecting
+                            connecting = isConnecting,
+                            isAlreadyPaired = isAlreadyPaired
                         )
                     }
                 }
@@ -191,6 +207,7 @@ private fun DeviceRow(
     device: BleDeviceItem,
     onConnect: () -> Unit,
     connecting: Boolean,
+    isAlreadyPaired: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -217,13 +234,20 @@ private fun DeviceRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (isAlreadyPaired) {
+                    Text(
+                        text = "Already paired to other foot",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
 
             Button(
                 onClick = onConnect,
-                enabled = !connecting,
+                enabled = !connecting && !isAlreadyPaired,
             ) {
-                Text("Connect")
+                Text(if (isAlreadyPaired) "Paired" else "Connect")
             }
         }
     }

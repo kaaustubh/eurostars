@@ -204,6 +204,7 @@ fun PairingOnboardingRoute(
                     target = activeTarget!!,
                     devices = uiState.scannedDevices,
                     pairingState = uiState.pairingState,
+                    pairingStatus = pairingStatus,
                     onDeviceSelected = { device ->
                         val target = activeTarget ?: return@PairingScanScreen
                         vm.connectToDevice(device, target)

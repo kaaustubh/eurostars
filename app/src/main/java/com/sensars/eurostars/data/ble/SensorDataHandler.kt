@@ -20,6 +20,20 @@ class SensorDataHandler(private val context: Context) {
 
     // Unified streams that combine both sensors
     private val unifiedStreams = SensorDataStreams()
+    
+    // State to accumulate IMU component values per sensor
+    // This allows us to merge X, Y, Z components that arrive separately
+    private data class ImuState(
+        var x: Float = Float.NaN,
+        var y: Float = Float.NaN,
+        var z: Float = Float.NaN,
+        var lastUpdateNanos: Long = 0L
+    )
+    
+    private val leftAccelState = ImuState()
+    private val rightAccelState = ImuState()
+    private val leftGyroState = ImuState()
+    private val rightGyroState = ImuState()
 
     /**
      * Register a sensor's data streams.
@@ -41,11 +55,25 @@ class SensorDataHandler(private val context: Context) {
         when (sensorSide) {
             PairingTarget.LEFT_SENSOR -> {
                 leftSensorStreams = null
-                android.util.Log.d("SensorDataHandler", "Unregistered LEFT_SENSOR streams")
+                // Reset IMU state for left sensor
+                leftAccelState.x = Float.NaN
+                leftAccelState.y = Float.NaN
+                leftAccelState.z = Float.NaN
+                leftGyroState.x = Float.NaN
+                leftGyroState.y = Float.NaN
+                leftGyroState.z = Float.NaN
+                // android.util.Log.d("SensorDataHandler", "Unregistered LEFT_SENSOR streams")
             }
             PairingTarget.RIGHT_SENSOR -> {
                 rightSensorStreams = null
-                android.util.Log.d("SensorDataHandler", "Unregistered RIGHT_SENSOR streams")
+                // Reset IMU state for right sensor
+                rightAccelState.x = Float.NaN
+                rightAccelState.y = Float.NaN
+                rightAccelState.z = Float.NaN
+                rightGyroState.x = Float.NaN
+                rightGyroState.y = Float.NaN
+                rightGyroState.z = Float.NaN
+                // android.util.Log.d("SensorDataHandler", "Unregistered RIGHT_SENSOR streams")
             }
         }
     }
@@ -124,6 +152,7 @@ class SensorDataHandler(private val context: Context) {
     /**
      * Update IMU values (equivalent to pseudocode updateIMU function).
      * Maps UUID to IMU component (accelX/Y/Z, gyroX/Y/Z, temp) and updates the sample.
+     * For accelerometer and gyroscope, maintains state to merge X, Y, Z components that arrive separately.
      */
     private fun updateIMU(
         uuid: UUID,
@@ -137,20 +166,42 @@ class SensorDataHandler(private val context: Context) {
         when {
             component.startsWith("accel") -> {
                 val componentValue = SensorDecoders.decodeFloat(value)
-                val x = if (component == "accelX") componentValue else Float.NaN
-                val y = if (component == "accelY") componentValue else Float.NaN
-                val z = if (component == "accelZ") componentValue else Float.NaN
-                val sample = AccelSample(x, y, z, timestampNanos, sensorSide)
+                val state = when (sensorSide) {
+                    PairingTarget.LEFT_SENSOR -> leftAccelState
+                    PairingTarget.RIGHT_SENSOR -> rightAccelState
+                }
+                
+                // Update the appropriate component in state
+                when (component) {
+                    "accelX" -> state.x = componentValue
+                    "accelY" -> state.y = componentValue
+                    "accelZ" -> state.z = componentValue
+                }
+                state.lastUpdateNanos = timestampNanos
+                
+                // Emit sample with current state (may have NaN for components not yet received)
+                val sample = AccelSample(state.x, state.y, state.z, timestampNanos, sensorSide)
                 streams._accel.tryEmit(sample)
                 unifiedStreams._accel.tryEmit(sample)
                 return true
             }
             component.startsWith("gyro") -> {
                 val componentValue = SensorDecoders.decodeFloat(value)
-                val x = if (component == "gyroX") componentValue else Float.NaN
-                val y = if (component == "gyroY") componentValue else Float.NaN
-                val z = if (component == "gyroZ") componentValue else Float.NaN
-                val sample = GyroSample(x, y, z, timestampNanos, sensorSide)
+                val state = when (sensorSide) {
+                    PairingTarget.LEFT_SENSOR -> leftGyroState
+                    PairingTarget.RIGHT_SENSOR -> rightGyroState
+                }
+                
+                // Update the appropriate component in state
+                when (component) {
+                    "gyroX" -> state.x = componentValue
+                    "gyroY" -> state.y = componentValue
+                    "gyroZ" -> state.z = componentValue
+                }
+                state.lastUpdateNanos = timestampNanos
+                
+                // Emit sample with current state (may have NaN for components not yet received)
+                val sample = GyroSample(state.x, state.y, state.z, timestampNanos, sensorSide)
                 streams._gyro.tryEmit(sample)
                 unifiedStreams._gyro.tryEmit(sample)
                 return true

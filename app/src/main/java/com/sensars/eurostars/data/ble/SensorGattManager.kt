@@ -24,7 +24,7 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
     private fun discoverPressureServiceCharacteristics() {
         val pressureService = gatt.getService(BleUuids.PRESSURE_SERVICE)
         if (pressureService == null) {
-            android.util.Log.e("SensorGattManager", "Pressure service (${BleUuids.PRESSURE_SERVICE}) not found!")
+            // android.util.Log.e("SensorGattManager", "Pressure service (${BleUuids.PRESSURE_SERVICE}) not found!")
             return
         }
         
@@ -32,7 +32,7 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
         val foundUuids = pressureService.characteristics.map { it.uuid }.toSet()
         val missingUuids = BleUuids.PRESSURE_DATA_CHARS.filter { it !in foundUuids }
         if (missingUuids.isNotEmpty()) {
-            android.util.Log.w("SensorGattManager", "Expected UUIDs NOT found in service: ${missingUuids.joinToString()}")
+            // android.util.Log.w("SensorGattManager", "Expected UUIDs NOT found in service: ${missingUuids.joinToString()}")
         }
     }
 
@@ -78,6 +78,7 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
             }
             // If writeOk is true, wait for onDescriptorWriteComplete callback
         } else {
+            // android.util.Log.d("SensorGattManager", "Descriptor write queue is empty, all notifications enabled")
             isProcessingQueue.set(false)
         }
     }
@@ -98,9 +99,9 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
         // Try to enable notifications for the f000a000 control characteristic first
         val controlCharUuid = UUID.fromString("f000a000-0000-1000-8000-00805f9b34fb")
         val controlResult = enableNotificationForCharacteristic(BleUuids.PRESSURE_SERVICE, controlCharUuid, queueDescriptor = false)
-        if (!controlResult.characteristicFound) {
-            android.util.Log.w("SensorGattManager", "Control characteristic f000a000 not found or not subscribable")
-        }
+        // if (!controlResult.characteristicFound) {
+        //     android.util.Log.w("SensorGattManager", "Control characteristic f000a000 not found or not subscribable")
+        // }
         
         // Wait a bit for the control characteristic write to complete
         scope.launch {
@@ -113,30 +114,42 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
                 val result = enableNotificationForCharacteristic(BleUuids.PRESSURE_SERVICE, charUuid, queueDescriptor = true)
                 if (!result.characteristicFound) {
                     notFoundUuids.add(charUuid)
-                    android.util.Log.w("SensorGattManager", "Taxel $index ($charUuid) not found")
+                    // android.util.Log.w("SensorGattManager", "Taxel $index ($charUuid) not found")
                 } else if (!result.notificationSupported) {
-                    android.util.Log.w("SensorGattManager", "Taxel $index ($charUuid) does not support notifications")
+                    // android.util.Log.w("SensorGattManager", "Taxel $index ($charUuid) does not support notifications")
                 }
             }
             
-            if (notFoundUuids.isNotEmpty()) {
-                android.util.Log.w("SensorGattManager", "Missing characteristics: ${notFoundUuids.joinToString()}")
-            }
+            // if (notFoundUuids.isNotEmpty()) {
+            //     android.util.Log.w("SensorGattManager", "Missing characteristics: ${notFoundUuids.joinToString()}")
+            // }
             
             // Start processing the queue
             processNextDescriptorWrite()
             
-            // Enable notifications for other characteristics (non-critical, can be done in parallel)
+            // Enable notifications for other characteristics (queue them sequentially like pressure)
             delay(500) // Wait a bit before starting other characteristics
             
-            BleUuids.ACCEL_DATA_CHARS.forEach { charUuid ->
-                enableNotificationForCharacteristic(BleUuids.ACCEL_SERVICE, charUuid, queueDescriptor = false)
+            // Queue accelerometer characteristics for sequential processing
+            BleUuids.ACCEL_DATA_CHARS.forEachIndexed { index, charUuid ->
+                enableNotificationForCharacteristic(BleUuids.ACCEL_SERVICE, charUuid, queueDescriptor = true)
             }
-
-            BleUuids.GYRO_DATA_CHARS.forEach { charUuid ->
-                enableNotificationForCharacteristic(BleUuids.GYRO_SERVICE, charUuid, queueDescriptor = false)
+            
+            // Queue gyroscope characteristics for sequential processing
+            BleUuids.GYRO_DATA_CHARS.forEachIndexed { index, charUuid ->
+                val result = enableNotificationForCharacteristic(BleUuids.GYRO_SERVICE, charUuid, queueDescriptor = true)
+                // if (!result.characteristicFound) {
+                //     android.util.Log.w("SensorGattManager", "Gyro characteristic $index ($charUuid) not found")
+                // } else if (!result.notificationSupported) {
+                //     android.util.Log.w("SensorGattManager", "Gyro characteristic $index ($charUuid) does not support notifications")
+                // }
             }
-
+            
+            // Continue processing the queue (accelerometer and gyro are now queued)
+            processNextDescriptorWrite()
+            
+            // Temperature and time can be done in parallel (non-critical)
+            delay(200) // Small delay before non-critical characteristics
             enableNotificationForCharacteristic(BleUuids.TEMPERATURE_SERVICE, BleUuids.TEMPERATURE_CHAR, queueDescriptor = false)
             enableNotificationForCharacteristic(BleUuids.TIMING_SERVICE, BleUuids.TIME_CHAR, queueDescriptor = false)
         }

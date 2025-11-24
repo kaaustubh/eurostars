@@ -48,10 +48,12 @@ object BleUuids {
     val TIME_CHAR: UUID = from16(0x2B90)
 
     // Accelerometer characteristics explicit
+    // Note: The sensor actually has f100b000, f100b001, f100b002
+    // Mapping: f100b000 = Z, f100b001 = X, f100b002 = Y
     val ACCEL_DATA_CHARS: List<UUID> = listOf(
-        uuid("F100B001-0000-1000-8000-00805F9B34FB"),
-        uuid("F100B002-0000-1000-8000-00805F9B34FB"),
-        uuid("F100B003-0000-1000-8000-00805F9B34FB")
+        uuid("F100B001-0000-1000-8000-00805F9B34FB"), // X
+        uuid("F100B002-0000-1000-8000-00805F9B34FB"), // Y
+        uuid("F100B000-0000-1000-8000-00805F9B34FB")  // Z (was f100b003, but sensor uses f100b000)
     )
 
     // Gyroscope characteristics explicit
