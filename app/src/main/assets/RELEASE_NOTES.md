@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.5(5)] - 2025-11-24
+
+### New Features
+- **RSSI Indicator**: Added Received Signal Strength Indicator (RSSI) display for paired sensors
+  - RSSI shown in dBm units in sensor pairing sections
+  - Displays both in collapsed header view and expanded details section
+  - RSSI captured during device scanning and stored with pairing information
+  - Periodic RSSI updates for connected sensors (every 5 seconds)
+  - Helps users monitor signal strength and connection quality
+
+### Improvements
+- **Accelerometer and Gyroscope Data Fix**: Fixed issue where only X-axis accelerometer data was visible, then X and Y, but not Z
+  - Implemented IMU state tracking to accumulate X, Y, Z components for complete samples
+  - Fixed accelerometer Z-axis UUID from F100B003 to F100B000 to match sensor hardware
+  - Enabled sequential descriptor writes for IMU characteristics to ensure all axes receive data
+  - All three axes (X, Y, Z) now properly receive and display data for both accelerometer and gyroscope
+- **Individual Sensor Unpairing**: Fixed issue where individual "Unpair" button didn't work correctly
+  - Corrected order of operations to clear pairing data first, then disconnect sensor
+  - Ensures UI updates immediately when unpairing a single sensor
+  - Individual unpair buttons now work as expected, matching "Clear all pairings" behavior
+- **Walk Mode UI Refinement**: Removed redundant instruction text from Walk Mode screen
+  - Cleaned up UI by removing duplicate "Press Start to begin a recording session" text
+  - Improved screen clarity with less redundant information
+
+### Technical
+- Implemented ImuState data class to track X, Y, Z components for accelerometer and gyroscope
+- Fixed accelerometer Z-axis UUID in BleUuids.kt (F100B000 instead of F100B003)
+- Enabled sequential descriptor writes for IMU characteristics via descriptorWriteQueue
+- Added RSSI to PairedSensor data structure and PairingRepository
+- Implemented RSSI handler registration in SensorConnectionManager
+- Fixed RSSI callback scope issue in onRssiRead handler
+- Enhanced BleRepository to capture RSSI from scan results
+- Added periodic RSSI reading for connected sensors via readRemoteRssi()
+- Corrected clearPairing() method order to ensure proper UI state updates
+- Set version to 0.0.5(5) with versionCode 5
+
+---
+
 ## [0.0.4(4)] - 2025-11-21
 
 ### New Features
