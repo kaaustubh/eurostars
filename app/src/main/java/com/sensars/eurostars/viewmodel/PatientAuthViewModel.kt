@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.firestore
+import com.sensars.eurostars.data.PatientsRepository
 import com.sensars.eurostars.data.RoleRepository
 import com.sensars.eurostars.data.SessionRepository
 import com.sensars.eurostars.data.UserRole
@@ -22,6 +23,7 @@ class PatientAuthViewModel(app: Application) : AndroidViewModel(app) {
     private val db = Firebase.firestore
     private val session = SessionRepository(app)
     private val roleRepo = RoleRepository(app)
+    private val patientsRepo = PatientsRepository()
 
     /**
      * Login a patient by verifying their Clinical Study ID exists in Firestore.
@@ -57,16 +59,35 @@ class PatientAuthViewModel(app: Application) : AndroidViewModel(app) {
                     if (snapshot.exists() && snapshot.data != null) {
                         // Exact match found - use the document ID as the actual patient ID
                         val actualPatientId = snapshot.id
-                        viewModelScope.launch {
-                            try {
-                                session.setPatient(actualPatientId)
-                                roleRepo.setRole(UserRole.PATIENT)
-                            } catch (e: Exception) {
-                                onError("Failed to save session. Please try again.")
-                                return@launch
+                        // Fetch patient data to get neuropathic leg info
+                        patientsRepo.getPatientDataByPatientId(
+                            patientId = actualPatientId,
+                            onSuccess = { patientFull ->
+                                viewModelScope.launch {
+                                    try {
+                                        session.setPatient(actualPatientId, patientFull.neuropathicLeg ?: "")
+                                        roleRepo.setRole(UserRole.PATIENT)
+                                    } catch (e: Exception) {
+                                        onError("Failed to save session. Please try again.")
+                                        return@launch
+                                    }
+                                    onSuccess()
+                                }
+                            },
+                            onError = { errorMsg ->
+                                // If fetching patient data fails, still allow login but without neuropathic leg info
+                                viewModelScope.launch {
+                                    try {
+                                        session.setPatient(actualPatientId)
+                                        roleRepo.setRole(UserRole.PATIENT)
+                                    } catch (e: Exception) {
+                                        onError("Failed to save session. Please try again.")
+                                        return@launch
+                                    }
+                                    onSuccess()
+                                }
                             }
-                            onSuccess()
-                        }
+                        )
                     } else {
                         // Exact match failed - try numeric matching
                         // Query all patients and match by numeric value in the patientId field
@@ -85,17 +106,35 @@ class PatientAuthViewModel(app: Application) : AndroidViewModel(app) {
                                 if (matchingDoc != null) {
                                     // Found a match with numeric comparison
                                     val actualPatientId = matchingDoc.getString("patientId") ?: matchingDoc.id
-                                    
-                                    viewModelScope.launch {
-                                        try {
-                                            session.setPatient(actualPatientId)
-                                            roleRepo.setRole(UserRole.PATIENT)
-                                        } catch (e: Exception) {
-                                            onError("Failed to save session. Please try again.")
-                                            return@launch
+                                    // Fetch patient data to get neuropathic leg info
+                                    patientsRepo.getPatientDataByPatientId(
+                                        patientId = actualPatientId,
+                                        onSuccess = { patientFull ->
+                                            viewModelScope.launch {
+                                                try {
+                                                    session.setPatient(actualPatientId, patientFull.neuropathicLeg ?: "")
+                                                    roleRepo.setRole(UserRole.PATIENT)
+                                                } catch (e: Exception) {
+                                                    onError("Failed to save session. Please try again.")
+                                                    return@launch
+                                                }
+                                                onSuccess()
+                                            }
+                                        },
+                                        onError = { errorMsg ->
+                                            // If fetching patient data fails, still allow login but without neuropathic leg info
+                                            viewModelScope.launch {
+                                                try {
+                                                    session.setPatient(actualPatientId)
+                                                    roleRepo.setRole(UserRole.PATIENT)
+                                                } catch (e: Exception) {
+                                                    onError("Failed to save session. Please try again.")
+                                                    return@launch
+                                                }
+                                                onSuccess()
+                                            }
                                         }
-                                        onSuccess()
-                                    }
+                                    )
                                 } else {
                                     // Also try normalized document ID lookup
                                     val normalizedDocRef = db.collection("patients").document(normalizedInput)
@@ -103,16 +142,35 @@ class PatientAuthViewModel(app: Application) : AndroidViewModel(app) {
                                         .addOnSuccessListener { normalizedSnapshot ->
                                             if (normalizedSnapshot.exists() && normalizedSnapshot.data != null) {
                                                 val actualPatientId = normalizedSnapshot.id
-                                                viewModelScope.launch {
-                                                    try {
-                                                        session.setPatient(actualPatientId)
-                                                        roleRepo.setRole(UserRole.PATIENT)
-                                                    } catch (e: Exception) {
-                                                        onError("Failed to save session. Please try again.")
-                                                        return@launch
+                                                // Fetch patient data to get neuropathic leg info
+                                                patientsRepo.getPatientDataByPatientId(
+                                                    patientId = actualPatientId,
+                                                    onSuccess = { patientFull ->
+                                                        viewModelScope.launch {
+                                                            try {
+                                                                session.setPatient(actualPatientId, patientFull.neuropathicLeg ?: "")
+                                                                roleRepo.setRole(UserRole.PATIENT)
+                                                            } catch (e: Exception) {
+                                                                onError("Failed to save session. Please try again.")
+                                                                return@launch
+                                                            }
+                                                            onSuccess()
+                                                        }
+                                                    },
+                                                    onError = { errorMsg ->
+                                                        // If fetching patient data fails, still allow login but without neuropathic leg info
+                                                        viewModelScope.launch {
+                                                            try {
+                                                                session.setPatient(actualPatientId)
+                                                                roleRepo.setRole(UserRole.PATIENT)
+                                                            } catch (e: Exception) {
+                                                                onError("Failed to save session. Please try again.")
+                                                                return@launch
+                                                            }
+                                                            onSuccess()
+                                                        }
                                                     }
-                                                    onSuccess()
-                                                }
+                                                )
                                             } else {
                                                 onError("Patient ID not found. Please check your ID and try again.")
                                             }

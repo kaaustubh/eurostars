@@ -155,4 +155,32 @@ class PatientsRepository {
                 onError(e.message ?: "Failed to fetch patients.")
             }
     }
+
+    /**
+     * Get patient data by patient ID (for patient app - no authentication required).
+     * Patients can access their own data using their patient ID.
+     */
+    fun getPatientDataByPatientId(
+        patientId: String,
+        onSuccess: (PatientFull) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val docRef = db.collection("patients").document(patientId)
+        docRef.get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot != null && snapshot.exists()) {
+                    val full = snapshot.toPatientFull()
+                    if (full != null) {
+                        onSuccess(full)
+                    } else {
+                        onError("Invalid patient record.")
+                    }
+                } else {
+                    onError("Patient not found.")
+                }
+            }
+            .addOnFailureListener { e ->
+                onError(e.message ?: "Failed to fetch patient data.")
+            }
+    }
 }

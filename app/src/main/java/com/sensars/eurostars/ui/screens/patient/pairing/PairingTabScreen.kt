@@ -37,6 +37,7 @@ import com.sensars.eurostars.data.ble.GyroSample
 import com.sensars.eurostars.data.ble.PressureSample
 import com.sensars.eurostars.data.ble.SensorConnectionManager
 import com.sensars.eurostars.data.ble.TemperatureSample
+import com.sensars.eurostars.data.SessionRepository
 import com.sensars.eurostars.viewmodel.PairingState
 import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
@@ -48,6 +49,13 @@ fun PairingTabScreen() {
     val uiState by vm.uiState.collectAsState()
     val context = LocalContext.current
     val connectionManager = (context.applicationContext as EurostarsApp).sensorConnectionManager
+    val sessionRepo = remember { SessionRepository(context) }
+    val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
+    
+    // Determine which legs need sensors based on neuropathic leg
+    val neuropathicLeg = session.neuropathicLeg.lowercase()
+    val isLeftLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "left" || neuropathicLeg == "both"
+    val isRightLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "right" || neuropathicLeg == "both"
 
     var activeTarget by remember { mutableStateOf<PairingTarget?>(null) }
     var showScanScreen by remember { mutableStateOf(false) }
@@ -229,34 +237,42 @@ fun PairingTabScreen() {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            SensorPairingSection(
-                title = "Left Foot Sensor",
-                state = leftSensorState,
-                isExpanded = leftExpanded,
-                onExpandedChange = { leftExpanded = it },
-                onPair = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = false) },
-                onPairAnother = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = true) },
-                showPairAnother = false, // Don't show "Pair another one" for left sensor
-                isConnected = leftConnected,
-                dataSampleCount = leftDataCount,
-                lastDataTime = leftLastDataTime,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
+            // Only show left sensor pairing if left leg is needed
+            if (isLeftLegNeeded) {
+                SensorPairingSection(
+                    title = "Left Foot Sensor",
+                    state = leftSensorState,
+                    isExpanded = leftExpanded,
+                    onExpandedChange = { leftExpanded = it },
+                    onPair = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = false) },
+                    onPairAnother = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = true) },
+                    showPairAnother = false, // Don't show "Pair another one" for left sensor
+                    isConnected = leftConnected,
+                    dataSampleCount = leftDataCount,
+                    lastDataTime = leftLastDataTime,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-            SensorPairingSection(
-                title = "Right Foot Sensor",
-                state = rightSensorState,
-                isExpanded = rightExpanded,
-                onExpandedChange = { rightExpanded = it },
-                onPair = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = false) },
-                onPairAnother = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = true) },
-                isConnected = rightConnected,
-                dataSampleCount = rightDataCount,
-                lastDataTime = rightLastDataTime,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
+            // Only show right sensor pairing if right leg is needed
+            if (isRightLegNeeded) {
+                SensorPairingSection(
+                    title = "Right Foot Sensor",
+                    state = rightSensorState,
+                    isExpanded = rightExpanded,
+                    onExpandedChange = { rightExpanded = it },
+                    onPair = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = false) },
+                    onPairAnother = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = true) },
+                    isConnected = rightConnected,
+                    dataSampleCount = rightDataCount,
+                    lastDataTime = rightLastDataTime,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 

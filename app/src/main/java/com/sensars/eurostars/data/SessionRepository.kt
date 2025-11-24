@@ -14,6 +14,7 @@ private val Context.sessionDataStore by preferencesDataStore(name = "auth_sessio
 private val KEY_ROLE       = stringPreferencesKey("role")        // "clinician" | "patient"
 private val KEY_EMAIL      = stringPreferencesKey("email")       // clinician email
 private val KEY_PATIENT_ID = stringPreferencesKey("patient_id")  // patient Clinical Study ID
+private val KEY_NEUROPATHIC_LEG = stringPreferencesKey("neuropathic_leg")  // "Left", "Right", "Both", or ""
 
 /**
  * Minimal session persistence used by AuthViewModel / PatientAuthViewModel.
@@ -24,7 +25,8 @@ class SessionRepository(private val context: Context) {
     data class Session(
         val role: String = "",          // "", "clinician", "patient"
         val email: String = "",         // set if role == clinician
-        val patientId: String = ""      // set if role == patient
+        val patientId: String = "",      // set if role == patient
+        val neuropathicLeg: String = "" // "Left", "Right", "Both", or "" (set if role == patient)
     )
 
     /** Observe the current session */
@@ -32,24 +34,29 @@ class SessionRepository(private val context: Context) {
         Session(
             role = p[KEY_ROLE] ?: "",
             email = p[KEY_EMAIL] ?: "",
-            patientId = p[KEY_PATIENT_ID] ?: ""
+            patientId = p[KEY_PATIENT_ID] ?: "",
+            neuropathicLeg = p[KEY_NEUROPATHIC_LEG] ?: ""
         )
     }
 
-    /** Set clinician session (clears patientId) */
+    /** Set clinician session (clears patientId and neuropathic leg) */
     suspend fun setClinician(email: String) {
         context.sessionDataStore.edit {
             it[KEY_ROLE] = "clinician"
             it[KEY_EMAIL] = email
             it.remove(KEY_PATIENT_ID)
+            it.remove(KEY_NEUROPATHIC_LEG)
         }
     }
 
     /** Set patient session (clears email) */
-    suspend fun setPatient(patientId: String) {
+    suspend fun setPatient(patientId: String, neuropathicLeg: String = "") {
         context.sessionDataStore.edit {
             it[KEY_ROLE] = "patient"
             it[KEY_PATIENT_ID] = patientId
+            if (neuropathicLeg.isNotBlank()) {
+                it[KEY_NEUROPATHIC_LEG] = neuropathicLeg
+            }
             it.remove(KEY_EMAIL)
         }
     }

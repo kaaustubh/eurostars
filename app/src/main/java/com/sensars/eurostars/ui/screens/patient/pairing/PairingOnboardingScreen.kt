@@ -43,12 +43,20 @@ fun PairingOnboardingScreen(
     rightDataCount: Long = 0,
     leftLastDataTime: Long? = null,
     rightLastDataTime: Long? = null,
+    isLeftLegNeeded: Boolean = true,
+    isRightLegNeeded: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var leftExpanded by remember { mutableStateOf(!leftSensorState.isPaired) }
     var rightExpanded by remember { mutableStateOf(!rightSensorState.isPaired) }
     
-    val bothPaired = leftSensorState.isPaired && rightSensorState.isPaired
+    // Check if all required sensors are paired
+    val allRequiredSensorsPaired = when {
+        isLeftLegNeeded && isRightLegNeeded -> leftSensorState.isPaired && rightSensorState.isPaired
+        isLeftLegNeeded -> leftSensorState.isPaired
+        isRightLegNeeded -> rightSensorState.isPaired
+        else -> true // No sensors needed
+    }
     
     Column(
         modifier = modifier
@@ -69,40 +77,46 @@ fun PairingOnboardingScreen(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Left Foot Sensor Section
-        SensorPairingSection(
-            title = "Left Foot Sensor",
-            state = leftSensorState,
-            isExpanded = leftExpanded,
-            onExpandedChange = { leftExpanded = it },
-            onPair = onPairLeftSensor,
-            onPairAnother = onPairAnotherLeft,
-            showPairAnother = false, // Don't show "Pair another one" for left sensor
-            isConnected = leftConnected,
-            dataSampleCount = leftDataCount,
-            lastDataTime = leftLastDataTime,
-            modifier = Modifier.padding(horizontal = 24.dp)
-        )
+        // Left Foot Sensor Section - only show if left leg is needed
+        if (isLeftLegNeeded) {
+            SensorPairingSection(
+                title = "Left Foot Sensor",
+                state = leftSensorState,
+                isExpanded = leftExpanded,
+                onExpandedChange = { leftExpanded = it },
+                onPair = onPairLeftSensor,
+                onPairAnother = onPairAnotherLeft,
+                showPairAnother = false, // Don't show "Pair another one" for left sensor
+                isConnected = leftConnected,
+                dataSampleCount = leftDataCount,
+                lastDataTime = leftLastDataTime,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
-        // Right Foot Sensor Section
-        SensorPairingSection(
-            title = "Right Foot Sensor",
-            state = rightSensorState,
-            isExpanded = rightExpanded,
-            onExpandedChange = { rightExpanded = it },
-            onPair = onPairRightSensor,
-            onPairAnother = onPairAnotherRight,
-            isConnected = rightConnected,
-            dataSampleCount = rightDataCount,
-            lastDataTime = rightLastDataTime,
-            modifier = Modifier.padding(horizontal = 24.dp)
-        )
+        // Right Foot Sensor Section - only show if right leg is needed
+        if (isRightLegNeeded) {
+            SensorPairingSection(
+                title = "Right Foot Sensor",
+                state = rightSensorState,
+                isExpanded = rightExpanded,
+                onExpandedChange = { rightExpanded = it },
+                onPair = onPairRightSensor,
+                onPairAnother = onPairAnotherRight,
+                isConnected = rightConnected,
+                dataSampleCount = rightDataCount,
+                lastDataTime = rightLastDataTime,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // Go to Home Screen Button (always enabled)
+        // Go to Home Screen Button (always enabled - patients can pair sensors later)
         Button(
             onClick = onGoToHome,
             modifier = Modifier

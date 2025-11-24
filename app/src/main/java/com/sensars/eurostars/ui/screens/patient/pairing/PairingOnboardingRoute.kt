@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.sensars.eurostars.EurostarsApp
+import com.sensars.eurostars.data.SessionRepository
 import com.sensars.eurostars.data.ble.SensorConnectionManager
 import com.sensars.eurostars.viewmodel.PairingState
 import com.sensars.eurostars.viewmodel.PairingTarget
@@ -28,6 +29,13 @@ fun PairingOnboardingRoute(
     val context = LocalContext.current
     val vm = bluetoothPairingViewModel()
     val connectionManager = (context.applicationContext as EurostarsApp).sensorConnectionManager
+    val sessionRepo = remember { SessionRepository(context) }
+    val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
+    
+    // Determine which legs need sensors based on neuropathic leg
+    val neuropathicLeg = session.neuropathicLeg.lowercase()
+    val isLeftLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "left" || neuropathicLeg == "both"
+    val isRightLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "right" || neuropathicLeg == "both"
 
     val uiState by vm.uiState.collectAsState()
     val pairingStatus = uiState.pairingStatus
@@ -98,8 +106,16 @@ fun PairingOnboardingRoute(
         batteryLevel = pairingStatus.rightSensor.batteryLevel
     )
 
-    LaunchedEffect(pairingStatus.areBothPaired) {
-        if (pairingStatus.areBothPaired) {
+    // Check if all required sensors are paired
+    val allRequiredSensorsPaired = when {
+        isLeftLegNeeded && isRightLegNeeded -> pairingStatus.areBothPaired
+        isLeftLegNeeded -> pairingStatus.isLeftPaired
+        isRightLegNeeded -> pairingStatus.isRightPaired
+        else -> true // No sensors needed
+    }
+    
+    LaunchedEffect(allRequiredSensorsPaired) {
+        if (allRequiredSensorsPaired) {
             onPairingComplete()
         }
     }
@@ -166,7 +182,9 @@ fun PairingOnboardingRoute(
             leftDataCount = leftDataCount,
             rightDataCount = rightDataCount,
             leftLastDataTime = leftLastDataTime,
-            rightLastDataTime = rightLastDataTime
+            rightLastDataTime = rightLastDataTime,
+            isLeftLegNeeded = isLeftLegNeeded,
+            isRightLegNeeded = isRightLegNeeded
         )
 
         if (showScanScreen && activeTarget != null) {

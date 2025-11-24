@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.sp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.platform.LocalContext
+import com.sensars.eurostars.data.SessionRepository
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
 
 @Composable
@@ -47,10 +49,25 @@ fun WalkModeScreen() {
     val pairingViewModel = bluetoothPairingViewModel()
     val pairingUiState by pairingViewModel.uiState.collectAsState()
     val pairingStatus = pairingUiState.pairingStatus
+    val context = LocalContext.current
+    val sessionRepo = remember { SessionRepository(context) }
+    val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
     
-    val areBothSensorsPaired = pairingStatus.areBothPaired
+    // Determine which legs need sensors based on neuropathic leg
+    val neuropathicLeg = session.neuropathicLeg.lowercase()
+    val isLeftLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "left" || neuropathicLeg == "both"
+    val isRightLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "right" || neuropathicLeg == "both"
+    
     val isLeftPaired = pairingStatus.isLeftPaired
     val isRightPaired = pairingStatus.isRightPaired
+    
+    // Only require pairing for the neuropathic leg(s)
+    val requiredSensorsPaired = when {
+        isLeftLegNeeded && isRightLegNeeded -> isLeftPaired && isRightPaired // Both legs needed
+        isLeftLegNeeded -> isLeftPaired // Only left leg needed
+        isRightLegNeeded -> isRightPaired // Only right leg needed
+        else -> true // No legs needed (shouldn't happen, but handle gracefully)
+    }
     
     var showStartDialog by remember { mutableStateOf(false) }
     var isWalkModeActive by remember { mutableStateOf(false) }
@@ -91,9 +108,11 @@ fun WalkModeScreen() {
 
         WalkModeControls(
             isActive = isWalkModeActive,
-            areBothSensorsPaired = areBothSensorsPaired,
+            areBothSensorsPaired = requiredSensorsPaired,
             isLeftPaired = isLeftPaired,
             isRightPaired = isRightPaired,
+            isLeftLegNeeded = isLeftLegNeeded,
+            isRightLegNeeded = isRightLegNeeded,
             onStartRequested = { showStartDialog = true },
             onStop = {
                 isWalkModeActive = false
@@ -123,8 +142,14 @@ fun WalkModeScreen() {
             onDismissRequest = { showStartDialog = false },
             title = { Text("Start Walk Mode?") },
             text = {
+                val neededSensors = when {
+                    isLeftLegNeeded && isRightLegNeeded -> "both sensors"
+                    isLeftLegNeeded -> "the left foot sensor"
+                    isRightLegNeeded -> "the right foot sensor"
+                    else -> "sensors"
+                }
                 Text(
-                    "Confirm to begin capturing pressure data from both sensors. " +
+                    "Confirm to begin capturing pressure data from $neededSensors. " +
                         "Ensure the patient is ready to walk."
                 )
             },
@@ -207,6 +232,8 @@ private fun WalkModeControls(
     areBothSensorsPaired: Boolean,
     isLeftPaired: Boolean,
     isRightPaired: Boolean,
+    isLeftLegNeeded: Boolean,
+    isRightLegNeeded: Boolean,
     onStartRequested: () -> Unit,
     onStop: () -> Unit
 ) {
@@ -240,19 +267,25 @@ private fun WalkModeControls(
                             "Tap Stop when the patient completes the walk. Data streams are buffered locally."
                         }
                         areBothSensorsPaired -> {
-                            "Tap Start to begin capturing live pressure data from both sensors."
+                            val neededSensors = when {
+                                isLeftLegNeeded && isRightLegNeeded -> "both sensors"
+                                isLeftLegNeeded -> "the left foot sensor"
+                                isRightLegNeeded -> "the right foot sensor"
+                                else -> "sensors"
+                            }
+                            "Tap Start to begin capturing live pressure data from $neededSensors."
                         }
-                        !isLeftPaired && !isRightPaired -> {
+                        !isLeftPaired && isLeftLegNeeded && !isRightPaired && isRightLegNeeded -> {
                             "Please pair both left and right foot sensors in the Pairing tab before starting."
                         }
-                        !isLeftPaired -> {
+                        !isLeftPaired && isLeftLegNeeded -> {
                             "Please pair the left foot sensor in the Pairing tab before starting."
                         }
-                        !isRightPaired -> {
+                        !isRightPaired && isRightLegNeeded -> {
                             "Please pair the right foot sensor in the Pairing tab before starting."
                         }
                         else -> {
-                            "Please pair both sensors in the Pairing tab before starting."
+                            "Please pair the required sensor(s) in the Pairing tab before starting."
                         }
                     },
                     style = MaterialTheme.typography.bodySmall,
