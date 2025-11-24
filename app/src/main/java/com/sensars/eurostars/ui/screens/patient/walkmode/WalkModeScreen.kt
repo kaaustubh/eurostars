@@ -124,17 +124,6 @@ fun WalkModeScreen() {
             isActive = isWalkModeActive,
             modifier = Modifier.fillMaxWidth()
         )
-
-        Text(
-            text = if (isWalkModeActive) {
-                "Live pressure data is being captured. Walk naturally and keep the sensors snug."
-            } else {
-                "Press Start to begin a recording session. Make sure both sensors are paired and ready."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 
     if (showStartDialog) {
