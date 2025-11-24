@@ -269,13 +269,13 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
      */
     fun clearPairing(target: PairingTarget) {
         viewModelScope.launch {
-            // Disconnect from SensorConnectionManager
-            connectionManager.disconnectSensor(target)
-            // Clear pairing data
+            // Clear pairing data first to ensure UI updates immediately
             when (target) {
                 PairingTarget.LEFT_SENSOR -> pairingRepo.clearLeftSensor()
                 PairingTarget.RIGHT_SENSOR -> pairingRepo.clearRightSensor()
             }
+            // Then disconnect from SensorConnectionManager
+            connectionManager.disconnectSensor(target)
         }
     }
 
