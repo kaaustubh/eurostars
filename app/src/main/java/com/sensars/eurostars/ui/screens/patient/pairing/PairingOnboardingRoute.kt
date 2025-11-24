@@ -104,7 +104,8 @@ fun PairingOnboardingRoute(
         deviceName = pairingStatus.leftSensor.deviceName,
         serialNumber = pairingStatus.leftSensor.serialNumber,
         firmwareVersion = pairingStatus.leftSensor.firmwareVersion,
-        batteryLevel = pairingStatus.leftSensor.batteryLevel
+        batteryLevel = pairingStatus.leftSensor.batteryLevel,
+        rssi = pairingStatus.leftSensor.rssi
     )
 
     val rightSensorState = SensorPairingState(
@@ -112,7 +113,8 @@ fun PairingOnboardingRoute(
         deviceName = pairingStatus.rightSensor.deviceName,
         serialNumber = pairingStatus.rightSensor.serialNumber,
         firmwareVersion = pairingStatus.rightSensor.firmwareVersion,
-        batteryLevel = pairingStatus.rightSensor.batteryLevel
+        batteryLevel = pairingStatus.rightSensor.batteryLevel,
+        rssi = pairingStatus.rightSensor.rssi
     )
 
     // Check if all required sensors are paired

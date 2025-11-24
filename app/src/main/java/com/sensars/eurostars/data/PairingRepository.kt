@@ -16,19 +16,22 @@ private val KEY_LEFT_SENSOR_NAME = stringPreferencesKey("left_sensor_name")
 private val KEY_LEFT_SENSOR_SERIAL = stringPreferencesKey("left_sensor_serial")
 private val KEY_LEFT_SENSOR_FW_VERSION = stringPreferencesKey("left_sensor_fw_version")
 private val KEY_LEFT_SENSOR_BATTERY = stringPreferencesKey("left_sensor_battery")
+private val KEY_LEFT_SENSOR_RSSI = stringPreferencesKey("left_sensor_rssi")
 
 private val KEY_RIGHT_SENSOR_ID = stringPreferencesKey("right_sensor_id")
 private val KEY_RIGHT_SENSOR_NAME = stringPreferencesKey("right_sensor_name")
 private val KEY_RIGHT_SENSOR_SERIAL = stringPreferencesKey("right_sensor_serial")
 private val KEY_RIGHT_SENSOR_FW_VERSION = stringPreferencesKey("right_sensor_fw_version")
 private val KEY_RIGHT_SENSOR_BATTERY = stringPreferencesKey("right_sensor_battery")
+private val KEY_RIGHT_SENSOR_RSSI = stringPreferencesKey("right_sensor_rssi")
 
 data class PairedSensor(
     val deviceId: String? = null,
     val deviceName: String? = null,
     val serialNumber: String? = null,
     val firmwareVersion: String? = null,
-    val batteryLevel: Int? = null
+    val batteryLevel: Int? = null,
+    val rssi: Int? = null
 )
 
 data class PairingStatus(
@@ -54,14 +57,16 @@ class PairingRepository(private val context: Context) {
                 deviceName = prefs[KEY_LEFT_SENSOR_NAME],
                 serialNumber = prefs[KEY_LEFT_SENSOR_SERIAL],
                 firmwareVersion = prefs[KEY_LEFT_SENSOR_FW_VERSION],
-                batteryLevel = prefs[KEY_LEFT_SENSOR_BATTERY]?.toIntOrNull()
+                batteryLevel = prefs[KEY_LEFT_SENSOR_BATTERY]?.toIntOrNull(),
+                rssi = prefs[KEY_LEFT_SENSOR_RSSI]?.toIntOrNull()
             ),
             rightSensor = PairedSensor(
                 deviceId = prefs[KEY_RIGHT_SENSOR_ID],
                 deviceName = prefs[KEY_RIGHT_SENSOR_NAME],
                 serialNumber = prefs[KEY_RIGHT_SENSOR_SERIAL],
                 firmwareVersion = prefs[KEY_RIGHT_SENSOR_FW_VERSION],
-                batteryLevel = prefs[KEY_RIGHT_SENSOR_BATTERY]?.toIntOrNull()
+                batteryLevel = prefs[KEY_RIGHT_SENSOR_BATTERY]?.toIntOrNull(),
+                rssi = prefs[KEY_RIGHT_SENSOR_RSSI]?.toIntOrNull()
             )
         )
     }
@@ -72,7 +77,8 @@ class PairingRepository(private val context: Context) {
         deviceName: String? = null,
         serialNumber: String? = null,
         firmwareVersion: String? = null,
-        batteryLevel: Int? = null
+        batteryLevel: Int? = null,
+        rssi: Int? = null
     ) {
         context.pairingDataStore.edit { prefs ->
             prefs[KEY_LEFT_SENSOR_ID] = deviceId
@@ -80,6 +86,7 @@ class PairingRepository(private val context: Context) {
             serialNumber?.let { prefs[KEY_LEFT_SENSOR_SERIAL] = it }
             firmwareVersion?.let { prefs[KEY_LEFT_SENSOR_FW_VERSION] = it }
             batteryLevel?.let { prefs[KEY_LEFT_SENSOR_BATTERY] = it.toString() }
+            rssi?.let { prefs[KEY_LEFT_SENSOR_RSSI] = it.toString() }
         }
     }
 
@@ -89,7 +96,8 @@ class PairingRepository(private val context: Context) {
         deviceName: String? = null,
         serialNumber: String? = null,
         firmwareVersion: String? = null,
-        batteryLevel: Int? = null
+        batteryLevel: Int? = null,
+        rssi: Int? = null
     ) {
         context.pairingDataStore.edit { prefs ->
             prefs[KEY_RIGHT_SENSOR_ID] = deviceId
@@ -97,6 +105,7 @@ class PairingRepository(private val context: Context) {
             serialNumber?.let { prefs[KEY_RIGHT_SENSOR_SERIAL] = it }
             firmwareVersion?.let { prefs[KEY_RIGHT_SENSOR_FW_VERSION] = it }
             batteryLevel?.let { prefs[KEY_RIGHT_SENSOR_BATTERY] = it.toString() }
+            rssi?.let { prefs[KEY_RIGHT_SENSOR_RSSI] = it.toString() }
         }
     }
 
@@ -108,6 +117,7 @@ class PairingRepository(private val context: Context) {
             prefs.remove(KEY_LEFT_SENSOR_SERIAL)
             prefs.remove(KEY_LEFT_SENSOR_FW_VERSION)
             prefs.remove(KEY_LEFT_SENSOR_BATTERY)
+            prefs.remove(KEY_LEFT_SENSOR_RSSI)
         }
     }
 
@@ -119,6 +129,7 @@ class PairingRepository(private val context: Context) {
             prefs.remove(KEY_RIGHT_SENSOR_SERIAL)
             prefs.remove(KEY_RIGHT_SENSOR_FW_VERSION)
             prefs.remove(KEY_RIGHT_SENSOR_BATTERY)
+            prefs.remove(KEY_RIGHT_SENSOR_RSSI)
         }
     }
 

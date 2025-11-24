@@ -25,7 +25,8 @@ data class SensorPairingState(
     val deviceName: String? = null,
     val serialNumber: String? = null,
     val firmwareVersion: String? = null,
-    val batteryLevel: Int? = null
+    val batteryLevel: Int? = null,
+    val rssi: Int? = null
 )
 
 @Composable
@@ -211,6 +212,13 @@ internal fun SensorPairingSection(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                                state.rssi?.let { rssi ->
+                                    Text(
+                                        text = "📶 ${rssi} dBm",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                             // Data reception status with colored indicator
                             if (isConnected) {
@@ -330,6 +338,14 @@ internal fun SensorPairingSection(
                             label = "Battery Level",
                             value = "$battery%",
                             isHighlighted = true
+                        )
+                    }
+                    
+                    state.rssi?.let { rssi ->
+                        SensorDetailRow(
+                            label = "Signal Strength",
+                            value = "$rssi dBm",
+                            isHighlighted = false
                         )
                     }
                     

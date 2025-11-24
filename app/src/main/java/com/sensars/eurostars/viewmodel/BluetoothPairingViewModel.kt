@@ -193,12 +193,13 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
                             deviceName = device.name ?: "Unknown Device",
                             serialNumber = gattInfo?.serialNumber ?: extractSerialNumber(device),
                             firmwareVersion = gattInfo?.firmwareRevision ?: extractFirmwareVersion(device),
-                            batteryLevel = gattInfo?.batteryLevel ?: extractBatteryLevel(device)
+                            batteryLevel = gattInfo?.batteryLevel ?: extractBatteryLevel(device),
+                            rssi = device.rssi
                         )
                         // Save pairing information
                         when (target) {
-                            PairingTarget.LEFT_SENSOR -> pairingRepo.setLeftSensor(deviceInfo.deviceId, deviceInfo.deviceName, deviceInfo.serialNumber, deviceInfo.firmwareVersion, deviceInfo.batteryLevel)
-                            PairingTarget.RIGHT_SENSOR -> pairingRepo.setRightSensor(deviceInfo.deviceId, deviceInfo.deviceName, deviceInfo.serialNumber, deviceInfo.firmwareVersion, deviceInfo.batteryLevel)
+                            PairingTarget.LEFT_SENSOR -> pairingRepo.setLeftSensor(deviceInfo.deviceId, deviceInfo.deviceName, deviceInfo.serialNumber, deviceInfo.firmwareVersion, deviceInfo.batteryLevel, deviceInfo.rssi)
+                            PairingTarget.RIGHT_SENSOR -> pairingRepo.setRightSensor(deviceInfo.deviceId, deviceInfo.deviceName, deviceInfo.serialNumber, deviceInfo.firmwareVersion, deviceInfo.batteryLevel, deviceInfo.rssi)
                         }
                         
                         // Transfer GATT connection to SensorConnectionManager for persistent connection
@@ -284,5 +285,6 @@ private data class PairingDeviceInfo(
     val deviceName: String,
     val serialNumber: String? = null,
     val firmwareVersion: String? = null,
-    val batteryLevel: Int? = null
+    val batteryLevel: Int? = null,
+    val rssi: Int? = null
 )

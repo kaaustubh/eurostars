@@ -334,6 +334,24 @@ class SensorConnectionManager(private val context: Context) {
     }
     
     /**
+     * Read RSSI from a connected sensor.
+     * Returns null if sensor is not connected or RSSI cannot be read.
+     */
+    @SuppressLint("MissingPermission")
+    fun readRssi(sensorSide: PairingTarget): Int? {
+        val gatt = getGatt(sensorSide) ?: return null
+        return try {
+            // Note: readRemoteRssi() is asynchronous, but we can't easily get the result here
+            // For now, we'll need to handle RSSI reading differently
+            // This is a placeholder - actual RSSI reading needs to be done via callback
+            null
+        } catch (e: Exception) {
+            android.util.Log.w("SensorConnectionManager", "Error reading RSSI: ${e.message}")
+            null
+        }
+    }
+    
+    /**
      * Get the disconnection handler for a GATT connection.
      * Used by BleRepository to notify about disconnections.
      */
