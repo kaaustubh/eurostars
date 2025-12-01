@@ -47,8 +47,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.sensars.eurostars.EurostarsApp
 import com.sensars.eurostars.data.SessionRepository
 import com.sensars.eurostars.ui.navigation.Routes
+import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
 
 @Composable
@@ -60,6 +62,9 @@ fun WalkModeScreen(
     val pairingUiState by pairingViewModel.uiState.collectAsState()
     val pairingStatus = pairingUiState.pairingStatus
     val context = LocalContext.current
+    val connectionManager = (context.applicationContext as EurostarsApp).sensorConnectionManager
+    val leftConnectionState by connectionManager.leftSensorConnection.collectAsState()
+    val rightConnectionState by connectionManager.rightSensorConnection.collectAsState()
     val sessionRepo = remember { SessionRepository(context) }
     val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
     
@@ -70,6 +75,16 @@ fun WalkModeScreen(
     
     val isLeftPaired = pairingStatus.isLeftPaired
     val isRightPaired = pairingStatus.isRightPaired
+    
+    // Check both pairing and connection status
+    val leftEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.LEFT_SENSOR)
+    val rightEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.RIGHT_SENSOR)
+    val isLeftConnected = leftEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    val isRightConnected = rightEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    
+    // Calibration buttons should only be enabled if sensor is both paired AND connected
+    val isLeftReadyForCalibration = isLeftPaired && isLeftConnected
+    val isRightReadyForCalibration = isRightPaired && isRightConnected
     
     // Only require pairing for the neuropathic leg(s)
     val requiredSensorsPaired = when {
@@ -135,8 +150,8 @@ fun WalkModeScreen(
 
         HeatmapSection(
             isActive = isWalkModeActive,
-            isLeftPaired = isLeftPaired,
-            isRightPaired = isRightPaired,
+            isLeftPaired = isLeftReadyForCalibration,
+            isRightPaired = isRightReadyForCalibration,
             onCalibrateLeft = { 
                 parentNavController?.navigate(Routes.CALIBRATION_LEFT)
             },
