@@ -131,6 +131,7 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
 
     /**
      * Start scanning for BLE devices
+     * Automatically stops after 10 seconds if no devices are found
      */
     fun startScanning(target: PairingTarget) {
         if (!bleRepository.hasScanPermission()) {
@@ -145,9 +146,22 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
         _uiState.value = _uiState.value.copy(pairingState = PairingState.SCANNING, currentTarget = target, scannedDevices = emptyList(), errorMessage = null)
 
         scanJob = viewModelScope.launch {
+            // Launch timeout job to stop scanning after 10 seconds if no devices found
+            val timeoutJob = launch {
+                kotlinx.coroutines.delay(10000) // 10 seconds
+                // Check if still scanning and no devices found
+                if (_uiState.value.pairingState == PairingState.SCANNING && _uiState.value.scannedDevices.isEmpty()) {
+                    stopScanning()
+                }
+            }
+            
             bleRepository.scanForSensors().catch { throwable ->
+                timeoutJob.cancel()
                 _uiState.value = _uiState.value.copy(pairingState = PairingState.ERROR, errorMessage = throwable.message ?: "Scan failed")
             }.collect { device ->
+                // Cancel timeout if device is found
+                timeoutJob.cancel()
+                
                 val alreadyPresent = _uiState.value.scannedDevices.any { it.address == device.address }
                 if (!alreadyPresent) {
                     _uiState.value = _uiState.value.copy(scannedDevices = _uiState.value.scannedDevices + device)

@@ -116,7 +116,7 @@ class BleRepository(private val context: Context) {
                         connectionManager?.let { manager ->
                             // Check if there's a registered handler for this GATT
                             val handler = manager.getDisconnectionHandler(gatt)
-                            handler?.invoke(device.address, sensorSide)
+                            handler?.invoke(device.address, sensorSide);
                         }
                     }
                     onDisconnected(null)

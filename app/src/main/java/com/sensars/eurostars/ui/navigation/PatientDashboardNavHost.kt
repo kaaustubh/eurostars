@@ -10,13 +10,19 @@ import com.sensars.eurostars.ui.screens.patient.pairing.PairingTabScreen
 import com.sensars.eurostars.ui.screens.patient.walkmode.WalkModeScreen
 
 @Composable
-fun PatientDashboardNavHost(navController: NavHostController) {
+fun PatientDashboardNavHost(
+    navController: NavHostController,
+    parentNavController: androidx.navigation.NavController?
+) {
     NavHost(
         navController = navController,
         startDestination = PatientTab.WalkMode.route
     ) {
         composable(PatientTab.WalkMode.route) {
-            WalkModeScreen()
+            WalkModeScreen(
+                navController = navController,
+                parentNavController = parentNavController
+            )
         }
         
         composable(PatientTab.GaitAnalysis.route) {

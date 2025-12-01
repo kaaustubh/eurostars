@@ -3,6 +3,8 @@ package com.sensars.eurostars.ui.screens.patient.walkmode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,11 +44,18 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.sensars.eurostars.data.SessionRepository
+import com.sensars.eurostars.ui.navigation.Routes
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
 
 @Composable
-fun WalkModeScreen() {
+fun WalkModeScreen(
+    navController: NavController = rememberNavController(),
+    parentNavController: NavController? = null
+) {
     val pairingViewModel = bluetoothPairingViewModel()
     val pairingUiState by pairingViewModel.uiState.collectAsState()
     val pairingStatus = pairingUiState.pairingStatus
@@ -84,9 +94,12 @@ fun WalkModeScreen() {
         }
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
@@ -122,6 +135,14 @@ fun WalkModeScreen() {
 
         HeatmapSection(
             isActive = isWalkModeActive,
+            isLeftPaired = isLeftPaired,
+            isRightPaired = isRightPaired,
+            onCalibrateLeft = { 
+                parentNavController?.navigate(Routes.CALIBRATION_LEFT)
+            },
+            onCalibrateRight = { 
+                parentNavController?.navigate(Routes.CALIBRATION_RIGHT)
+            },
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -311,6 +332,10 @@ private fun WalkModeControls(
 @Composable
 private fun HeatmapSection(
     isActive: Boolean,
+    isLeftPaired: Boolean,
+    isRightPaired: Boolean,
+    onCalibrateLeft: () -> Unit,
+    onCalibrateRight: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -326,8 +351,20 @@ private fun HeatmapSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            FootHeatmapCard(title = "Left foot", isActive = isActive, modifier = Modifier.weight(1f))
-            FootHeatmapCard(title = "Right foot", isActive = isActive, modifier = Modifier.weight(1f))
+            FootHeatmapCard(
+                title = "Left foot",
+                isActive = isActive,
+                isPaired = isLeftPaired,
+                onCalibrate = onCalibrateLeft,
+                modifier = Modifier.weight(1f)
+            )
+            FootHeatmapCard(
+                title = "Right foot",
+                isActive = isActive,
+                isPaired = isRightPaired,
+                onCalibrate = onCalibrateRight,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Text(
@@ -342,6 +379,8 @@ private fun HeatmapSection(
 private fun FootHeatmapCard(
     title: String,
     isActive: Boolean,
+    isPaired: Boolean,
+    onCalibrate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -400,6 +439,16 @@ private fun FootHeatmapCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            OutlinedButton(
+                onClick = onCalibrate,
+                enabled = isPaired,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Calibrate")
+            }
         }
     }
 }

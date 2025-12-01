@@ -140,7 +140,23 @@ fun NavHost(navController: NavHostController) {
                     navController.navigate(Routes.ROLE_SELECT) {
                         popUpTo(Routes.PATIENT_HOME) { inclusive = true }
                     }
-                }
+                },
+                parentNavController = navController
+            )
+        }
+        
+        // Calibration screens (full-screen, outside patient dashboard)
+        composable(Routes.CALIBRATION_LEFT) {
+            com.sensars.eurostars.ui.screens.patient.walkmode.CalibrationScreen(
+                navController = navController,
+                footSide = "Left"
+            )
+        }
+        
+        composable(Routes.CALIBRATION_RIGHT) {
+            com.sensars.eurostars.ui.screens.patient.walkmode.CalibrationScreen(
+                navController = navController,
+                footSide = "Right"
             )
         }
     }

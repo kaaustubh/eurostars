@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sensars.eurostars.ui.navigation.PatientDashboardNavHost
 import com.sensars.eurostars.ui.screens.patient.dashboard.PatientBottomBar
@@ -14,7 +16,10 @@ import com.sensars.eurostars.viewmodel.patientAuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PatientHomeScreen(onLogout: () -> Unit = {}) {
+fun PatientHomeScreen(
+    onLogout: () -> Unit = {},
+    parentNavController: NavController? = null
+) {
     var showLogoutConfirm by remember { mutableStateOf(false) }
     val vm = patientAuthViewModel()
     
@@ -40,7 +45,10 @@ fun PatientHomeScreen(onLogout: () -> Unit = {}) {
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            PatientDashboardNavHost(navController = dashboardNav)
+            PatientDashboardNavHost(
+                navController = dashboardNav,
+                parentNavController = parentNavController
+            )
         }
 
         // Logout confirmation dialog
