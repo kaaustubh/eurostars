@@ -108,21 +108,37 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
             delay(200) // Wait 200ms for control characteristic to complete
             
             // Enable notifications for pressure characteristics - queue them
-            val notFoundUuids = mutableListOf<UUID>()
-            
+            // Use discovery-based approach: enable ALL characteristics in the service that support NOTIFY
+            val pressureService = gatt.getService(BleUuids.PRESSURE_SERVICE)
+            if (pressureService != null) {
+                pressureService.characteristics.forEach { characteristic ->
+                    val charUuid = characteristic.uuid
+                    val props = characteristic.properties
+                    
+                    // Check if it supports NOTIFY
+                    if (props and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
+                        // Check if it's one of our known pressure characteristics or the control char
+                        // (or just enable everything in this service to be safe)
+                        val result = enableNotificationForCharacteristic(BleUuids.PRESSURE_SERVICE, charUuid, queueDescriptor = true)
+                        
+                        val index = BleUuids.taxelUuidToIndexMap()[charUuid]
+                        if (index != null) {
+                            android.util.Log.d("SensorGattManager", "Discovered and enabling Taxel $index ($charUuid)")
+                        } else {
+                            android.util.Log.d("SensorGattManager", "Discovered and enabling unknown char ($charUuid)")
+                        }
+                    }
+                }
+            } else {
+                 android.util.Log.e("SensorGattManager", "Pressure service not found during enable!")
+            }
+
+            /* Previous hardcoded list approach commented out
             BleUuids.PRESSURE_DATA_CHARS.forEachIndexed { index, charUuid ->
                 val result = enableNotificationForCharacteristic(BleUuids.PRESSURE_SERVICE, charUuid, queueDescriptor = true)
-                if (!result.characteristicFound) {
-                    notFoundUuids.add(charUuid)
-                    // android.util.Log.w("SensorGattManager", "Taxel $index ($charUuid) not found")
-                } else if (!result.notificationSupported) {
-                    // android.util.Log.w("SensorGattManager", "Taxel $index ($charUuid) does not support notifications")
-                }
+                // ...
             }
-            
-            // if (notFoundUuids.isNotEmpty()) {
-            //     android.util.Log.w("SensorGattManager", "Missing characteristics: ${notFoundUuids.joinToString()}")
-            // }
+            */
             
             // Start processing the queue
             processNextDescriptorWrite()
@@ -237,6 +253,7 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
             if (queueDescriptor) {
                 // Queue for sequential processing
                 descriptorWriteQueue.offer(Pair(characteristicUuid, descriptor))
+                android.util.Log.d("SensorGattManager", "Queued descriptor write for $characteristicUuid")
                 return resultWithNotify.copy(descriptorWritten = true) // Consider it queued as success
             } else {
                 // Write immediately (for non-critical characteristics)

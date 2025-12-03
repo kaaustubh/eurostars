@@ -45,10 +45,10 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sensars.eurostars.EurostarsApp
 import com.sensars.eurostars.data.SessionRepository
+import com.sensars.eurostars.ui.components.FootHeatmap
 import com.sensars.eurostars.ui.navigation.Routes
 import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
@@ -67,25 +67,31 @@ fun WalkModeScreen(
     val rightConnectionState by connectionManager.rightSensorConnection.collectAsState()
     val sessionRepo = remember { SessionRepository(context) }
     val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
-    
+
     // Determine which legs need sensors based on neuropathic leg
     val neuropathicLeg = session.neuropathicLeg.lowercase()
-    val isLeftLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "left" || neuropathicLeg == "both"
-    val isRightLegNeeded = neuropathicLeg.isEmpty() || neuropathicLeg == "right" || neuropathicLeg == "both"
-    
+    val isLeftLegNeeded =
+        neuropathicLeg.isEmpty() || neuropathicLeg == "left" || neuropathicLeg == "both"
+    val isRightLegNeeded =
+        neuropathicLeg.isEmpty() || neuropathicLeg == "right" || neuropathicLeg == "both"
+
     val isLeftPaired = pairingStatus.isLeftPaired
     val isRightPaired = pairingStatus.isRightPaired
-    
+
     // Check both pairing and connection status
-    val leftEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.LEFT_SENSOR)
-    val rightEffectiveState = connectionManager.getEffectiveConnectionState(PairingTarget.RIGHT_SENSOR)
-    val isLeftConnected = leftEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
-    val isRightConnected = rightEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
-    
+    val leftEffectiveState =
+        connectionManager.getEffectiveConnectionState(PairingTarget.LEFT_SENSOR)
+    val rightEffectiveState =
+        connectionManager.getEffectiveConnectionState(PairingTarget.RIGHT_SENSOR)
+    val isLeftConnected =
+        leftEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    val isRightConnected =
+        rightEffectiveState == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+
     // Calibration buttons should only be enabled if sensor is both paired AND connected
     val isLeftReadyForCalibration = isLeftPaired && isLeftConnected
     val isRightReadyForCalibration = isRightPaired && isRightConnected
-    
+
     // Only require pairing for the neuropathic leg(s)
     val requiredSensorsPaired = when {
         isLeftLegNeeded && isRightLegNeeded -> isLeftPaired && isRightPaired // Both legs needed
@@ -93,7 +99,7 @@ fun WalkModeScreen(
         isRightLegNeeded -> isRightPaired // Only right leg needed
         else -> true // No legs needed (shouldn't happen, but handle gracefully)
     }
-    
+
     var showStartDialog by remember { mutableStateOf(false) }
     var isWalkModeActive by remember { mutableStateOf(false) }
     var sessionStart by remember { mutableStateOf<LocalDateTime?>(null) }
@@ -152,6 +158,7 @@ fun WalkModeScreen(
             isActive = isWalkModeActive,
             isLeftPaired = isLeftReadyForCalibration,
             isRightPaired = isRightReadyForCalibration,
+            connectionManager = connectionManager,
             onCalibrateLeft = { 
                 parentNavController?.navigate(Routes.CALIBRATION_LEFT)
             },
@@ -175,7 +182,7 @@ fun WalkModeScreen(
                 }
                 Text(
                     "Confirm to begin capturing pressure data from $neededSensors. " +
-                        "Ensure the patient is ready to walk."
+                            "Ensure the patient is ready to walk."
                 )
             },
             confirmButton = {
@@ -236,7 +243,10 @@ private fun SessionStatusCard(
                     append("Session start: ")
                     append(sessionStart?.format(formatter) ?: "—")
                     append("\nSession end: ")
-                    append(sessionEnd?.format(formatter) ?: if (isActive) "—" else "Awaiting next session")
+                    append(
+                        sessionEnd?.format(formatter)
+                            ?: if (isActive) "—" else "Awaiting next session"
+                    )
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -291,6 +301,7 @@ private fun WalkModeControls(
                         isActive -> {
                             "Tap Stop when the patient completes the walk. Data streams are buffered locally."
                         }
+
                         areBothSensorsPaired -> {
                             val neededSensors = when {
                                 isLeftLegNeeded && isRightLegNeeded -> "both sensors"
@@ -300,15 +311,19 @@ private fun WalkModeControls(
                             }
                             "Tap Start to begin capturing live pressure data from $neededSensors."
                         }
+
                         !isLeftPaired && isLeftLegNeeded && !isRightPaired && isRightLegNeeded -> {
                             "Please pair both left and right foot sensors in the Pairing tab before starting."
                         }
+
                         !isLeftPaired && isLeftLegNeeded -> {
                             "Please pair the left foot sensor in the Pairing tab before starting."
                         }
+
                         !isRightPaired && isRightLegNeeded -> {
                             "Please pair the right foot sensor in the Pairing tab before starting."
                         }
+
                         else -> {
                             "Please pair the required sensor(s) in the Pairing tab before starting."
                         }
@@ -349,6 +364,7 @@ private fun HeatmapSection(
     isActive: Boolean,
     isLeftPaired: Boolean,
     isRightPaired: Boolean,
+    connectionManager: com.sensars.eurostars.data.ble.SensorConnectionManager,
     onCalibrateLeft: () -> Unit,
     onCalibrateRight: () -> Unit,
     modifier: Modifier = Modifier
@@ -370,6 +386,8 @@ private fun HeatmapSection(
                 title = "Left foot",
                 isActive = isActive,
                 isPaired = isLeftPaired,
+                connectionManager = connectionManager,
+                sensorSide = PairingTarget.LEFT_SENSOR,
                 onCalibrate = onCalibrateLeft,
                 modifier = Modifier.weight(1f)
             )
@@ -377,6 +395,8 @@ private fun HeatmapSection(
                 title = "Right foot",
                 isActive = isActive,
                 isPaired = isRightPaired,
+                connectionManager = connectionManager,
+                sensorSide = PairingTarget.RIGHT_SENSOR,
                 onCalibrate = onCalibrateRight,
                 modifier = Modifier.weight(1f)
             )
@@ -395,9 +415,46 @@ private fun FootHeatmapCard(
     title: String,
     isActive: Boolean,
     isPaired: Boolean,
+    connectionManager: com.sensars.eurostars.data.ble.SensorConnectionManager,
+    sensorSide: PairingTarget,
     onCalibrate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val dataHandler = connectionManager.getDataHandler()
+    val isLeftFoot = sensorSide == PairingTarget.LEFT_SENSOR
+    
+    // Get connection state
+    val connectionStateFlow = if (isLeftFoot) {
+        connectionManager.leftSensorConnection
+    } else {
+        connectionManager.rightSensorConnection
+    }
+    val connectionState by connectionStateFlow.collectAsState()
+    val isConnected = connectionState?.state == com.sensars.eurostars.data.ble.SensorConnectionState.CONNECTED
+    
+    // Collect pressure data for this sensor - using same pattern as Pairing tab
+    var pressureData by remember { mutableStateOf<Map<Int, Long>>(emptyMap()) }
+    
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            val pressureFlow = dataHandler.getPressureFlow(sensorSide)
+            try {
+                pressureFlow.collect { sample ->
+                    if (isConnected) { // Check connection state before updating
+                        pressureData = pressureData + (sample.taxelIndex to sample.value)
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Ignore other exceptions
+            }
+        } else {
+            // Clear data when disconnected
+            pressureData = emptyMap()
+        }
+    }
+    
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
@@ -423,32 +480,33 @@ private fun FootHeatmapCard(
                     .fillMaxWidth()
                     .aspectRatio(0.75f)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = if (isActive) 0.7f else 0.35f),
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = if (isActive) 0.6f else 0.25f),
-                                MaterialTheme.colorScheme.secondary.copy(alpha = if (isActive) 0.5f else 0.2f),
-                                MaterialTheme.colorScheme.error.copy(alpha = if (isActive) 0.4f else 0.15f)
-                            )
-                        )
-                    ),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (isActive) "Streaming..." else "Awaiting data",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.Medium
+                if (isPaired && pressureData.isNotEmpty()) {
+                    FootHeatmap(
+                        pressureData = pressureData,
+                        isLeftFoot = isLeftFoot,
+                        modifier = Modifier.fillMaxSize()
                     )
-                )
+                } else {
+                    Text(
+                        text = if (isPaired) "Awaiting data" else "Not connected",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
             }
 
             Text(
-                text = if (isActive) {
+                text = if (isActive && isPaired) {
                     "Live sensor feed"
+                } else if (isPaired) {
+                    "Ready - Start walk mode to see data"
                 } else {
-                    "Will light up once walk mode starts"
+                    "Sensor not connected"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
