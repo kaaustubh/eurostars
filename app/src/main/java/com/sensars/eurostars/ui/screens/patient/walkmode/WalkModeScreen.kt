@@ -56,7 +56,7 @@ import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
 import kotlinx.coroutines.launch
 
-import com.sensars.eurostars.data.WalkModeRepository
+import com.sensars.eurostars.viewmodel.walkModeViewModel
 
 // ...
 
@@ -66,6 +66,8 @@ fun WalkModeScreen(
     parentNavController: NavController? = null
 ) {
     val pairingViewModel = bluetoothPairingViewModel()
+    val walkModeViewModel = walkModeViewModel()
+    
     val pairingUiState by pairingViewModel.uiState.collectAsState()
     val pairingStatus = pairingUiState.pairingStatus
     val context = LocalContext.current
@@ -75,8 +77,10 @@ fun WalkModeScreen(
     val sessionRepo = remember { SessionRepository(context) }
     val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
     
-    val walkModeRepo = remember { WalkModeRepository(context) }
-    val scope = rememberCoroutineScope()
+    // Walk Mode State from ViewModel
+    val isWalkModeActive by walkModeViewModel.isWalkModeActive.collectAsState()
+    val sessionStart by walkModeViewModel.sessionStartTime.collectAsState()
+    val sessionEnd by walkModeViewModel.sessionEndTime.collectAsState()
 
     // Determine which legs need sensors based on neuropathic leg
     val neuropathicLeg = session.neuropathicLeg.lowercase()
@@ -111,19 +115,7 @@ fun WalkModeScreen(
     }
 
     var showStartDialog by remember { mutableStateOf(false) }
-    var isWalkModeActive by remember { mutableStateOf(false) }
-    var sessionStart by remember { mutableStateOf<LocalDateTime?>(null) }
-    var sessionEnd by remember { mutableStateOf<LocalDateTime?>(null) }
-
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm:ss") }
-
-    LaunchedEffect(isWalkModeActive) {
-        if (!isWalkModeActive) {
-            sessionEnd = sessionEnd ?: sessionStart?.let { LocalDateTime.now() }
-        } else {
-            sessionEnd = null
-        }
-    }
 
     val scrollState = rememberScrollState()
 
@@ -161,18 +153,14 @@ fun WalkModeScreen(
                isRightLegNeeded = isRightLegNeeded,
                onStartRequested = { showStartDialog = true },
                onStop = {
-                   isWalkModeActive = false
-                   sessionEnd = LocalDateTime.now()
-                   scope.launch {
-                       walkModeRepo.stopSession(
-                           onSuccess = {
-                               Toast.makeText(context, "Session uploaded successfully", Toast.LENGTH_SHORT).show()
-                           },
-                           onError = { error ->
-                               Toast.makeText(context, "Upload failed: $error", Toast.LENGTH_LONG).show()
-                           }
-                       )
-                   }
+                   walkModeViewModel.stopWalkMode(
+                       onSuccess = {
+                           Toast.makeText(context, "Session uploaded successfully", Toast.LENGTH_SHORT).show()
+                       },
+                       onError = { error ->
+                           Toast.makeText(context, "Upload failed: $error", Toast.LENGTH_LONG).show()
+                       }
+                   )
                }
            )
 
@@ -211,10 +199,7 @@ fun WalkModeScreen(
                 TextButton(
                     onClick = {
                         showStartDialog = false
-                        sessionStart = LocalDateTime.now()
-                        sessionEnd = null
-                        isWalkModeActive = true
-                        walkModeRepo.startSession(connectionManager.getDataHandler().getUnifiedStreams())
+                        walkModeViewModel.startWalkMode()
                     }
                 ) {
                     Text("Start")
