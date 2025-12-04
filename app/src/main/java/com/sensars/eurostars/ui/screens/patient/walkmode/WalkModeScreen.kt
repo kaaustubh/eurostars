@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import android.widget.Toast
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
@@ -53,6 +55,10 @@ import com.sensars.eurostars.ui.navigation.Routes
 import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
 import kotlinx.coroutines.launch
+
+import com.sensars.eurostars.data.WalkModeRepository
+
+// ...
 
 @Composable
 fun WalkModeScreen(
@@ -68,6 +74,9 @@ fun WalkModeScreen(
     val rightConnectionState by connectionManager.rightSensorConnection.collectAsState()
     val sessionRepo = remember { SessionRepository(context) }
     val session by sessionRepo.sessionFlow.collectAsState(initial = SessionRepository.Session())
+    
+    val walkModeRepo = remember { WalkModeRepository(context) }
+    val scope = rememberCoroutineScope()
 
     // Determine which legs need sensors based on neuropathic leg
     val neuropathicLeg = session.neuropathicLeg.lowercase()
@@ -93,12 +102,12 @@ fun WalkModeScreen(
     val isLeftReadyForCalibration = isLeftPaired && isLeftConnected
     val isRightReadyForCalibration = isRightPaired && isRightConnected
 
-    // Only require pairing for the neuropathic leg(s)
-    val requiredSensorsPaired = when {
-        isLeftLegNeeded && isRightLegNeeded -> isLeftPaired && isRightPaired // Both legs needed
-        isLeftLegNeeded -> isLeftPaired // Only left leg needed
-        isRightLegNeeded -> isRightPaired // Only right leg needed
-        else -> true // No legs needed (shouldn't happen, but handle gracefully)
+    // Check if required sensors are CONNECTED (not just paired)
+    val isReadyToStart = when {
+        isLeftLegNeeded && isRightLegNeeded -> isLeftConnected && isRightConnected
+        isLeftLegNeeded -> isLeftConnected
+        isRightLegNeeded -> isRightConnected
+        else -> false
     }
 
     var showStartDialog by remember { mutableStateOf(false) }
@@ -141,19 +150,31 @@ fun WalkModeScreen(
             )
         }
 
-        WalkModeControls(
-            isActive = isWalkModeActive,
-            areBothSensorsPaired = requiredSensorsPaired,
-            isLeftPaired = isLeftPaired,
-            isRightPaired = isRightPaired,
-            isLeftLegNeeded = isLeftLegNeeded,
-            isRightLegNeeded = isRightLegNeeded,
-            onStartRequested = { showStartDialog = true },
-            onStop = {
-                isWalkModeActive = false
-                sessionEnd = LocalDateTime.now()
-            }
-        )
+           WalkModeControls(
+               isActive = isWalkModeActive,
+               isReadyToStart = isReadyToStart,
+               isLeftPaired = isLeftPaired,
+               isRightPaired = isRightPaired,
+               isLeftConnected = isLeftConnected,
+               isRightConnected = isRightConnected,
+               isLeftLegNeeded = isLeftLegNeeded,
+               isRightLegNeeded = isRightLegNeeded,
+               onStartRequested = { showStartDialog = true },
+               onStop = {
+                   isWalkModeActive = false
+                   sessionEnd = LocalDateTime.now()
+                   scope.launch {
+                       walkModeRepo.stopSession(
+                           onSuccess = {
+                               Toast.makeText(context, "Session uploaded successfully", Toast.LENGTH_SHORT).show()
+                           },
+                           onError = { error ->
+                               Toast.makeText(context, "Upload failed: $error", Toast.LENGTH_LONG).show()
+                           }
+                       )
+                   }
+               }
+           )
 
         HeatmapSection(
             isActive = isWalkModeActive,
@@ -193,6 +214,7 @@ fun WalkModeScreen(
                         sessionStart = LocalDateTime.now()
                         sessionEnd = null
                         isWalkModeActive = true
+                        walkModeRepo.startSession(connectionManager.getDataHandler().getUnifiedStreams())
                     }
                 ) {
                     Text("Start")
@@ -265,9 +287,11 @@ private fun SessionStatusCard(
 @Composable
 private fun WalkModeControls(
     isActive: Boolean,
-    areBothSensorsPaired: Boolean,
+    isReadyToStart: Boolean,
     isLeftPaired: Boolean,
     isRightPaired: Boolean,
+    isLeftConnected: Boolean,
+    isRightConnected: Boolean,
     isLeftLegNeeded: Boolean,
     isRightLegNeeded: Boolean,
     onStartRequested: () -> Unit,
@@ -289,10 +313,10 @@ private fun WalkModeControls(
                 Text(
                     text = if (isActive) {
                         "Walk mode is active"
-                    } else if (areBothSensorsPaired) {
+                    } else if (isReadyToStart) {
                         "Ready to start"
                     } else {
-                        "Sensors not paired"
+                        "Sensors not ready"
                     },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium)
                 )
@@ -303,7 +327,7 @@ private fun WalkModeControls(
                             "Tap Stop when the patient completes the walk. Data streams are buffered locally."
                         }
 
-                        areBothSensorsPaired -> {
+                        isReadyToStart -> {
                             val neededSensors = when {
                                 isLeftLegNeeded && isRightLegNeeded -> "both sensors"
                                 isLeftLegNeeded -> "the left foot sensor"
@@ -313,10 +337,7 @@ private fun WalkModeControls(
                             "Tap Start to begin capturing live pressure data from $neededSensors."
                         }
 
-                        !isLeftPaired && isLeftLegNeeded && !isRightPaired && isRightLegNeeded -> {
-                            "Please pair both left and right foot sensors in the Pairing tab before starting."
-                        }
-
+                        // Missing pairing cases
                         !isLeftPaired && isLeftLegNeeded -> {
                             "Please pair the left foot sensor in the Pairing tab before starting."
                         }
@@ -325,8 +346,17 @@ private fun WalkModeControls(
                             "Please pair the right foot sensor in the Pairing tab before starting."
                         }
 
+                        // Paired but not connected cases
+                        isLeftLegNeeded && !isLeftConnected -> {
+                            "Left sensor paired but not connected. Check sensor power and proximity."
+                        }
+
+                        isRightLegNeeded && !isRightConnected -> {
+                            "Right sensor paired but not connected. Check sensor power and proximity."
+                        }
+
                         else -> {
-                            "Please pair the required sensor(s) in the Pairing tab before starting."
+                            "Please pair and connect the required sensor(s) before starting."
                         }
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -350,7 +380,7 @@ private fun WalkModeControls(
             } else {
                 Button(
                     onClick = onStartRequested,
-                    enabled = areBothSensorsPaired,
+                    enabled = isReadyToStart,
                     modifier = Modifier.clip(RoundedCornerShape(12.dp))
                 ) {
                     Text("Start", fontSize = 16.sp)

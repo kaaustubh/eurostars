@@ -1,123 +1,137 @@
 package com.sensars.eurostars.data
 
+import android.content.Context
 import com.google.firebase.Firebase
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.firestore
-import com.sensars.eurostars.data.ble.PressureSample
+
+import com.sensars.eurostars.data.ble.SensorDataStreams
 import com.sensars.eurostars.viewmodel.PairingTarget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Date
+import java.util.UUID
 
 /**
- * Repository for managing Walk Mode session data.
- * Buffers sensor data during sessions and uploads to Firestore on session end.
+ * Repository for managing Walk Mode sessions.
+ * Handles starting/stopping sessions, buffering data, and uploading to Firestore.
  */
-class WalkModeRepository {
-    private val db: FirebaseFirestore = Firebase.firestore
-
-    /**
-     * Session data structure for Firestore upload.
-     */
-    data class WalkModeSession(
-        val patientId: String,
-        val sessionStartTime: Timestamp,
-        val sessionEndTime: Timestamp,
-        val leftSensorData: List<PressureDataPoint>,
-        val rightSensorData: List<PressureDataPoint>
+class WalkModeRepository(private val context: Context) {
+    private val db = Firebase.firestore
+    private val auth = FirebaseAuth.getInstance()
+    private val sessionRepo = SessionRepository(context)
+    
+    private var activeSessionId: String? = null
+    private var sessionStartTime: Long = 0
+    private var collectionJob: Job? = null
+    
+    // In-memory buffer for the current session
+    // Structure: Map of SensorSide -> Map of DataType -> List of Data
+    private val sessionBuffer =  SessionBuffer()
+    
+    data class SessionBuffer(
+        val leftPressure: MutableList<PressureDataPoint> = mutableListOf(),
+        val rightPressure: MutableList<PressureDataPoint> = mutableListOf(),
+        // We can add IMU data later if needed
     )
-
-    /**
-     * Pressure data point with timestamp.
-     */
+    
     data class PressureDataPoint(
+        val timestamp: Long,
         val taxelIndex: Int,
-        val value: Long,
-        val timestampNanos: Long,
-        val timestampMillis: Long // System time in milliseconds
+        val value: Long
     )
 
-    /**
-     * Buffer for storing pressure data during a session.
-     */
-    private val sessionBuffer = mutableListOf<Pair<PairingTarget, PressureSample>>()
+    fun isSessionActive(): Boolean = activeSessionId != null
 
-    /**
-     * Add pressure sample to session buffer.
-     */
-    fun addPressureSample(sensorSide: PairingTarget, sample: PressureSample) {
-        sessionBuffer.add(sensorSide to sample)
-    }
-
-    /**
-     * Clear the session buffer.
-     */
-    fun clearBuffer() {
-        sessionBuffer.clear()
-    }
-
-    /**
-     * Upload session data to Firestore.
-     * @param patientId Patient ID for the session
-     * @param sessionStartTime Session start timestamp
-     * @param sessionEndTime Session end timestamp
-     * @param onSuccess Callback on successful upload
-     * @param onError Callback on upload error
-     */
-    suspend fun uploadSession(
-        patientId: String,
-        sessionStartTime: Timestamp,
-        sessionEndTime: Timestamp,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        try {
-            // Separate data by sensor side
-            val leftData = sessionBuffer
-                .filter { it.first == PairingTarget.LEFT_SENSOR }
-                .map { (_, sample) ->
-                    PressureDataPoint(
-                        taxelIndex = sample.taxelIndex,
-                        value = sample.value,
-                        timestampNanos = sample.timestampNanos,
-                        timestampMillis = sample.timestampNanos / 1_000_000 // Convert nanos to millis
-                    )
+    fun startSession(dataStreams: SensorDataStreams) {
+        if (isSessionActive()) return
+        
+        activeSessionId = UUID.randomUUID().toString() // Temporary ID, will use incremental for display if needed
+        sessionStartTime = System.currentTimeMillis()
+        sessionBuffer.leftPressure.clear()
+        sessionBuffer.rightPressure.clear()
+        
+        // Start collecting data
+        collectionJob = CoroutineScope(Dispatchers.IO).launch {
+            launch {
+                dataStreams.pressure.collect { sample ->
+                    val point = PressureDataPoint(sample.timestampNanos, sample.taxelIndex, sample.value)
+                    if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
+                        synchronized(sessionBuffer.leftPressure) {
+                            sessionBuffer.leftPressure.add(point)
+                        }
+                    } else {
+                        synchronized(sessionBuffer.rightPressure) {
+                            sessionBuffer.rightPressure.add(point)
+                        }
+                    }
                 }
-
-            val rightData = sessionBuffer
-                .filter { it.first == PairingTarget.RIGHT_SENSOR }
-                .map { (_, sample) ->
-                    PressureDataPoint(
-                        taxelIndex = sample.taxelIndex,
-                        value = sample.value,
-                        timestampNanos = sample.timestampNanos,
-                        timestampMillis = sample.timestampNanos / 1_000_000
-                    )
-                }
-
-            val session = WalkModeSession(
-                patientId = patientId,
-                sessionStartTime = sessionStartTime,
-                sessionEndTime = sessionEndTime,
-                leftSensorData = leftData,
-                rightSensorData = rightData
-            )
-
-            // Upload to Firestore
-            db.collection("walkModeSessions")
-                .add(session)
-                .await()
-
-            // Clear buffer after successful upload
-            clearBuffer()
-            onSuccess()
-        } catch (e: Exception) {
-            onError("Failed to upload session: ${e.message}")
+            }
         }
     }
 
-    /**
-     * Get current buffer size (for monitoring).
-     */
-    fun getBufferSize(): Int = sessionBuffer.size
-}
+    suspend fun stopSession(onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (!isSessionActive()) return
+        
+        collectionJob?.cancel()
+        collectionJob = null
+        val endTime = System.currentTimeMillis()
+        
+        // Get current patient ID and session info
+        // Note: We need to get this from SessionRepository
+        // For now, assume we can get it or pass it in.
+        // Let's fetch it from Firestore or SessionRepo inside the upload.
+        
+        uploadSession(endTime, onSuccess, onError)
+        
+        activeSessionId = null
+    }
 
+    private suspend fun uploadSession(endTime: Long, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        // Get patient ID from session repo
+        val session = sessionRepo.sessionFlow.first()
+        val patientId = if (session.role == "patient") session.patientId else null
+        
+        if (patientId.isNullOrEmpty()) {
+            onError("No active patient session found")
+            return
+        }
+
+        try {
+            // Determine Session ID (Auto-increment)
+            // We simply count existing documents. Note: This is not concurrency-safe for high volume,
+            // but sufficient for a single-user app instance.
+            val sessionsRef = db.collection("patients").document(patientId).collection("sessions")
+            val snapshot = sessionsRef.get().await()
+            val nextSessionId = (snapshot.size() + 1).toString()
+            
+            val sessionDoc = sessionsRef.document(nextSessionId)
+            
+            // Prepare data
+            // Mapping short keys to save space: t=timestamp, i=index, v=value
+            val data = hashMapOf(
+                "sessionId" to nextSessionId,
+                "startTime" to Date(sessionStartTime),
+                "endTime" to Date(endTime),
+                "leftFootData" to sessionBuffer.leftPressure.map { 
+                    mapOf("t" to it.timestamp, "i" to it.taxelIndex, "v" to it.value) 
+                },
+                "rightFootData" to sessionBuffer.rightPressure.map {
+                    mapOf("t" to it.timestamp, "i" to it.taxelIndex, "v" to it.value)
+                }
+            )
+            
+            // Upload
+            sessionDoc.set(data).await()
+            onSuccess()
+            
+        } catch (e: Exception) {
+            onError("Upload failed: ${e.message}")
+        }
+    }
+}
