@@ -93,6 +93,16 @@ class WalkModeRepository(private val context: Context) {
     }
 
     private suspend fun uploadSession(endTime: Long, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        // Ensure we are authenticated (for anonymous patient sessions)
+        if (auth.currentUser == null) {
+            try {
+                auth.signInAnonymously().await()
+            } catch (e: Exception) {
+                onError("Authentication failed: ${e.message}")
+                return
+            }
+        }
+
         // Get patient ID from session repo
         val session = sessionRepo.sessionFlow.first()
         val patientId = if (session.role == "patient") session.patientId else null
