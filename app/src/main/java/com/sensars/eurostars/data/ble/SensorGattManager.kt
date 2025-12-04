@@ -123,9 +123,9 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
                         
                         val index = BleUuids.taxelUuidToIndexMap()[charUuid]
                         if (index != null) {
-                            android.util.Log.d("SensorGattManager", "Discovered and enabling Taxel $index ($charUuid)")
+                            // android.util.Log.d("SensorGattManager", "Discovered and enabling Taxel $index ($charUuid)")
                         } else {
-                            android.util.Log.d("SensorGattManager", "Discovered and enabling unknown char ($charUuid)")
+                            // android.util.Log.d("SensorGattManager", "Discovered and enabling unknown char ($charUuid)")
                         }
                     }
                 }
@@ -253,7 +253,7 @@ class SensorGattManager(private val gatt: BluetoothGatt) {
             if (queueDescriptor) {
                 // Queue for sequential processing
                 descriptorWriteQueue.offer(Pair(characteristicUuid, descriptor))
-                android.util.Log.d("SensorGattManager", "Queued descriptor write for $characteristicUuid")
+                // android.util.Log.d("SensorGattManager", "Queued descriptor write for $characteristicUuid")
                 return resultWithNotify.copy(descriptorWritten = true) // Consider it queued as success
             } else {
                 // Write immediately (for non-critical characteristics)

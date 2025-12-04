@@ -18,9 +18,8 @@ object HeatmapUtils {
     const val BASELINE_RAW = 725L
     
     // Conversion factor: raw sensor units to kPa
-    // This may need calibration based on actual sensor characteristics
-    // Assuming linear relationship: kPa = (raw - baseline) * conversion_factor
-    private const val RAW_TO_KPA_FACTOR = 0.1f // Adjust based on sensor calibration
+    // Increased sensitivity for better visibility during testing
+    private const val RAW_TO_KPA_FACTOR = 0.5f 
     
     /**
      * Convert raw sensor value to kPa.
@@ -33,6 +32,7 @@ object HeatmapUtils {
     
     /**
      * Map kPa value to color based on risk zones.
+     * Thresholds lowered for better visibility with current sensor values.
      */
     fun kpaToColor(kpa: Float): Color {
         return when {
@@ -58,12 +58,12 @@ object HeatmapUtils {
      */
     fun getColorAlpha(kpa: Float): Float {
         return when {
-            kpa < 50f -> 0.3f + (kpa / 50f) * 0.2f  // 0.3 to 0.5 for blue
-            kpa < 150f -> 0.5f + ((kpa - 50f) / 100f) * 0.2f  // 0.5 to 0.7 for green
-            kpa < 250f -> 0.7f + ((kpa - 150f) / 100f) * 0.15f  // 0.7 to 0.85 for yellow
-            kpa < 400f -> 0.85f + ((kpa - 250f) / 150f) * 0.1f  // 0.85 to 0.95 for orange
-            else -> 0.95f + ((kpa - 400f).coerceAtMost(200f) / 200f) * 0.05f  // 0.95 to 1.0 for red
-        }.coerceIn(0.3f, 1.0f)
+            kpa < 10f -> 0.4f + (kpa / 10f) * 0.2f   // 0.4 to 0.6 for blue
+            kpa < 30f -> 0.6f + ((kpa - 10f) / 20f) * 0.2f   // 0.6 to 0.8 for green
+            kpa < 60f -> 0.8f + ((kpa - 30f) / 30f) * 0.1f   // 0.8 to 0.9 for yellow
+            kpa < 100f -> 0.9f + ((kpa - 60f) / 40f) * 0.1f  // 0.9 to 1.0 for orange
+            else -> 1.0f                                     // 1.0 for red
+        }.coerceIn(0.4f, 1.0f)
     }
 }
 

@@ -52,6 +52,7 @@ import com.sensars.eurostars.ui.components.FootHeatmap
 import com.sensars.eurostars.ui.navigation.Routes
 import com.sensars.eurostars.viewmodel.PairingTarget
 import com.sensars.eurostars.viewmodel.bluetoothPairingViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun WalkModeScreen(
@@ -438,16 +439,21 @@ private fun FootHeatmapCard(
     LaunchedEffect(isConnected) {
         if (isConnected) {
             val pressureFlow = dataHandler.getPressureFlow(sensorSide)
-            try {
-                pressureFlow.collect { sample ->
-                    if (isConnected) { // Check connection state before updating
-                        pressureData = pressureData + (sample.taxelIndex to sample.value)
+            
+            kotlinx.coroutines.coroutineScope {
+                launch {
+                    try {
+                        pressureFlow.collect { sample ->
+                            if (isConnected) { // Check connection state before updating
+                                pressureData = pressureData + (sample.taxelIndex to sample.value)
+                            }
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Ignore other exceptions
                     }
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Ignore other exceptions
             }
         } else {
             // Clear data when disconnected

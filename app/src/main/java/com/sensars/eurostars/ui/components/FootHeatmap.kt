@@ -88,11 +88,12 @@ private fun getTaxelPositions(isLeftFoot: Boolean): List<TaxelPosition> {
 // Foot outline is now drawn using an image asset instead of programmatically
 
 /**
- * Draw a taxel circle at the specified position with the given color.
+ * Draw a taxel circle at the specified position with the given color and alpha.
  */
 private fun DrawScope.drawTaxel(
     position: TaxelPosition,
     color: Color,
+    alpha: Float,
     size: Size,
     taxelRadius: Float
 ) {
@@ -100,10 +101,11 @@ private fun DrawScope.drawTaxel(
     val y = position.y * size.height
     
     // For a heatmap effect, we use a radial gradient that fades out
+    // Use the calculated alpha to reflect pressure intensity
     val brush = Brush.radialGradient(
         colors = listOf(
-            color.copy(alpha = 0.8f), // Center: High opacity
-            color.copy(alpha = 0.4f), // Mid: Medium opacity
+            color.copy(alpha = alpha * 0.9f), // Center: High opacity (scaled by calculated alpha)
+            color.copy(alpha = alpha * 0.5f), // Mid: Medium opacity
             color.copy(alpha = 0.0f)  // Edge: Transparent
         ),
         center = Offset(x, y),
@@ -165,14 +167,12 @@ fun FootHeatmap(
                 val kpa = HeatmapUtils.rawToKpa(rawValue)
                 val alpha = HeatmapUtils.getColorAlpha(kpa)
                 
-                // Debug log: Print updates for any taxel that has non-baseline data
-                if (rawValue != HeatmapUtils.BASELINE_RAW) {
-                    android.util.Log.d("FootHeatmap", "Taxel ${position.index} update: raw=$rawValue, kpa=$kpa")
-                }
-                
+                // Only draw if there's actual pressure (above baseline) or if we want to show baseline
+                // For now, always draw but use the calculated alpha
                 drawTaxel(
                     position = position,
-                    color = color.copy(alpha = alpha),
+                    color = color,
+                    alpha = alpha,
                     size = size,
                     taxelRadius = taxelRadius
                 )

@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,6 +25,7 @@ import androidx.navigation.NavController
 import com.sensars.eurostars.EurostarsApp
 import com.sensars.eurostars.ui.components.FootHeatmap
 import com.sensars.eurostars.viewmodel.PairingTarget
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,16 +55,21 @@ fun CalibrationScreen(
     LaunchedEffect(isConnected) {
         if (isConnected) {
             val pressureFlow = dataHandler.getPressureFlow(sensorSide)
-            try {
-                pressureFlow.collect { sample ->
-                    if (isConnected) { // Check connection state before updating
-                        pressureData = pressureData + (sample.taxelIndex to sample.value)
+            
+            kotlinx.coroutines.coroutineScope {
+                launch {
+                    try {
+                        pressureFlow.collect { sample ->
+                            if (isConnected) { // Check connection state before updating
+                                pressureData = pressureData + (sample.taxelIndex to sample.value)
+                            }
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Ignore other exceptions
                     }
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Ignore other exceptions
             }
         } else {
             // Clear data when disconnected
@@ -140,11 +147,11 @@ fun CalibrationScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        LegendItem("Blue", MaterialTheme.colorScheme.primary, "<50 kPa")
-                        LegendItem("Green", MaterialTheme.colorScheme.tertiary, "50-150 kPa")
-                        LegendItem("Yellow", MaterialTheme.colorScheme.secondary, "150-250 kPa")
-                        LegendItem("Orange", MaterialTheme.colorScheme.errorContainer, "250-400 kPa")
-                        LegendItem("Red", MaterialTheme.colorScheme.error, "400+ kPa")
+                        LegendItem("Blue", Color(0xFF2196F3), "<50 kPa")
+                        LegendItem("Green", Color(0xFF4CAF50), "50-100 kPa")
+                        LegendItem("Yellow", Color(0xFFFFEB3B), "100-150 kPa")
+                        LegendItem("Orange", Color(0xFFFF9800), "150-200 kPa")
+                        LegendItem("Red", Color(0xFFF44336), "200+ kPa")
                     }
                 }
             }
