@@ -1,9 +1,11 @@
 package com.sensars.eurostars.data
 
 import android.content.Context
+import android.net.Uri
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.firestore
+import com.google.firebase.storage.storage
 import com.sensars.eurostars.data.ble.SensorDataStreams
 import com.sensars.eurostars.viewmodel.PairingTarget
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.File
 import java.util.Date
 import java.util.UUID
 
@@ -118,6 +121,17 @@ class WalkModeRepository(private val context: Context) {
         uploadSession(session, leftData, rightData, onSuccess, onError)
     }
 
+import android.net.Uri
+import com.google.firebase.storage.storage
+import java.io.File
+
+// ...
+
+class WalkModeRepository(private val context: Context) {
+    private val db = Firebase.firestore
+    private val storage = Firebase.storage
+    // ...
+
     private suspend fun uploadSession(
         session: WalkSession, 
         leftData: List<PressureDataPoint>, 
@@ -139,16 +153,12 @@ class WalkModeRepository(private val context: Context) {
         }
 
         try {
-            // Determine remote Session ID
-            val sessionsRef = db.collection("patients").document(session.patientId).collection("sessions")
+            // 1. Upload Data File to Firebase Storage
+            // Path: patients/{patientId}/sessions/{sessionId}.json
+            // Since we don't have the final session ID yet, we use a temp one or generate one now.
+            // Let's generate the Session ID first to use in the path.
             
-            // If we already have a display ID (e.g. from previous partial attempt?), re-use? 
-            // Ideally we get a new one or keep consistent. 
-            // For now, let's always get a new one if it was "Pending" or "?".
-            // If we are retrying a FAILED one, we might want to check if it already exists? 
-            // Simpler: Just count again. Duplicate IDs in display might happen if we fail *after* writing but *before* confirming locally?
-            // Risk: If we fail to write local status UPLOADED, we might upload duplicate. 
-            // We can store the assigned remote ID in local DB.
+            val sessionsRef = db.collection("patients").document(session.patientId).collection("sessions")
             
             val nextSessionId = if (session.displaySessionId == "Pending" || session.displaySessionId == "?") {
                  val snapshot = sessionsRef.get().await()
@@ -157,6 +167,26 @@ class WalkModeRepository(private val context: Context) {
                 session.displaySessionId
             }
             
+            val storageRef = storage.reference
+                .child("patients")
+                .child(session.patientId)
+                .child("sessions")
+                .child("$nextSessionId.json")
+                
+            val localFile = File(context.filesDir, session.fileName)
+            if (!localFile.exists()) {
+                throw Exception("Local session file not found")
+            }
+            
+            // Upload file
+            storageRef.putFile(Uri.fromFile(localFile)).await()
+            
+            // Get Download URL
+            // Note: In some high-security rules, getting download URL might require specific permission.
+            // But usually standard auth is enough.
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+
+            // 2. Create Metadata Document in Firestore
             val sessionDoc = sessionsRef.document(nextSessionId)
             
             val data = hashMapOf(
@@ -164,12 +194,8 @@ class WalkModeRepository(private val context: Context) {
                 "startTime" to Date(session.startTime),
                 "endTime" to Date(session.endTime),
                 "dataSizeBytes" to session.dataSizeBytes,
-                "leftFootData" to leftData.map { 
-                    mapOf("t" to it.timestamp, "i" to it.taxelIndex, "v" to it.value) 
-                },
-                "rightFootData" to rightData.map {
-                    mapOf("t" to it.timestamp, "i" to it.taxelIndex, "v" to it.value)
-                }
+                "dataUrl" to downloadUrl,
+                "schemaVersion" to 2 // version 2 uses compact JSON and Storage
             )
             
             sessionDoc.set(data).await()

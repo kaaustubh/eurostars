@@ -150,11 +150,12 @@ class SessionHistoryManager(private val context: Context) {
     private fun serializeDataPoints(points: List<WalkModeRepository.PressureDataPoint>): JSONArray {
         val arr = JSONArray()
         points.forEach { p ->
-            val obj = JSONObject()
-            obj.put("t", p.timestamp)
-            obj.put("i", p.taxelIndex)
-            obj.put("v", p.value)
-            arr.put(obj)
+            // Compact format: array of [t, i, v] instead of object {t:_, i:_, v:_}
+            val pointArr = JSONArray()
+            pointArr.put(p.timestamp)
+            pointArr.put(p.taxelIndex)
+            pointArr.put(p.value)
+            arr.put(pointArr)
         }
         return arr
     }
@@ -162,12 +163,22 @@ class SessionHistoryManager(private val context: Context) {
     private fun parseDataPoints(arr: JSONArray): List<WalkModeRepository.PressureDataPoint> {
         val list = mutableListOf<WalkModeRepository.PressureDataPoint>()
         for (i in 0 until arr.length()) {
-            val obj = arr.getJSONObject(i)
-            list.add(WalkModeRepository.PressureDataPoint(
-                timestamp = obj.getLong("t"),
-                taxelIndex = obj.getInt("i"),
-                value = obj.getLong("v")
-            ))
+            val item = arr.get(i)
+            if (item is JSONArray) {
+                // Parse compact format [t, i, v]
+                list.add(WalkModeRepository.PressureDataPoint(
+                    timestamp = item.getLong(0),
+                    taxelIndex = item.getInt(1),
+                    value = item.getLong(2)
+                ))
+            } else if (item is JSONObject) {
+                // Backward compatibility for object format {t, i, v}
+                list.add(WalkModeRepository.PressureDataPoint(
+                    timestamp = item.getLong("t"),
+                    taxelIndex = item.getInt("i"),
+                    value = item.getLong("v")
+                ))
+            }
         }
         return list
     }
