@@ -163,6 +163,7 @@ class WalkModeRepository(private val context: Context) {
                 "sessionId" to nextSessionId,
                 "startTime" to Date(session.startTime),
                 "endTime" to Date(session.endTime),
+                "dataSizeBytes" to session.dataSizeBytes,
                 "leftFootData" to leftData.map { 
                     mapOf("t" to it.timestamp, "i" to it.taxelIndex, "v" to it.value) 
                 },
@@ -198,6 +199,67 @@ class WalkModeRepository(private val context: Context) {
     }
     
     suspend fun getSessions(): List<WalkSession> {
-        return historyManager.getSessions()
+        val localSessions = historyManager.getSessions()
+        val remoteSessions = fetchRemoteSessions()
+        
+        // Merge sessions
+        // Map local sessions by display ID to check for duplicates
+        val localMap = localSessions.associateBy { it.displaySessionId }
+        val mergedList = localSessions.toMutableList()
+        
+        remoteSessions.forEach { remote ->
+            // If we don't have a local session with this remote ID, add it
+            if (!localMap.containsKey(remote.sessionId)) {
+                mergedList.add(remote)
+            } else {
+                // If we do have it, we might want to update status if local says PENDING/UPLOADING but remote exists?
+                // But for now, let's trust local state for existing ones (especially if they have fileName for retry).
+                // If local is FAILED but remote exists, it means maybe it succeeded on another try?
+                // For simplicity, we keep local version if it exists.
+            }
+        }
+        
+        return mergedList.sortedByDescending { it.startTime }
+    }
+
+    private suspend fun fetchRemoteSessions(): List<WalkSession> {
+        val patientId = getPatientId() ?: return emptyList()
+        
+        try {
+            // Ensure auth if needed (though getPatientId relies on session repo, not auth)
+            if (auth.currentUser == null) {
+                try {
+                    auth.signInAnonymously().await()
+                } catch (e: Exception) {
+                    return emptyList()
+                }
+            }
+
+            val sessionsRef = db.collection("patients").document(patientId).collection("sessions")
+            val snapshot = sessionsRef.get().await()
+            
+            return snapshot.documents.mapNotNull { doc ->
+                try {
+                    val startTime = doc.getDate("startTime")?.time ?: 0L
+                    val endTime = doc.getDate("endTime")?.time ?: 0L
+                    val size = doc.getLong("dataSizeBytes") ?: 0L
+                    
+                    WalkSession(
+                        sessionId = doc.id, // Use remote ID as local ID for remote-only sessions
+                        displaySessionId = doc.id,
+                        patientId = patientId,
+                        startTime = startTime,
+                        endTime = endTime,
+                        status = UploadStatus.UPLOADED,
+                        dataSizeBytes = size,
+                        fileName = "" // No local file
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            return emptyList()
+        }
     }
 }
