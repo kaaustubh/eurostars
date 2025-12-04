@@ -153,6 +153,14 @@ class SensorConnectionManager(private val context: Context) {
     fun acceptExistingConnection(gatt: BluetoothGatt, address: String, sensorSide: PairingTarget, streams: SensorDataStreams) {
         // Update state to CONNECTED
         val connectedState = SensorConnection(address, sensorSide, SensorConnectionState.CONNECTED, gatt)
+        
+        // Request high connection priority for faster updates
+        try {
+            gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+        } catch (e: Exception) {
+            android.util.Log.w("SensorConnectionManager", "Failed to request connection priority: ${e.message}")
+        }
+
         when (sensorSide) {
             PairingTarget.LEFT_SENSOR -> _leftSensorConnection.value = connectedState
             PairingTarget.RIGHT_SENSOR -> _rightSensorConnection.value = connectedState
@@ -247,6 +255,14 @@ class SensorConnectionManager(private val context: Context) {
             address = address,
             onConnected = { gatt ->
                 val connectedState = SensorConnection(address, sensorSide, SensorConnectionState.CONNECTED, gatt)
+                
+                // Request low power connection priority
+                try {
+                    gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
+                } catch (e: Exception) {
+                    android.util.Log.w("SensorConnectionManager", "Failed to request connection priority: ${e.message}")
+                }
+
                 when (sensorSide) {
                     PairingTarget.LEFT_SENSOR -> _leftSensorConnection.value = connectedState
                     PairingTarget.RIGHT_SENSOR -> _rightSensorConnection.value = connectedState
