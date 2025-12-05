@@ -252,7 +252,7 @@ fun PairingTabScreen() {
                     onPair = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = false) },
                     onPairAnother = { startPairing(PairingTarget.LEFT_SENSOR, resetExisting = true) },
                     onUnpair = if (leftSensorState.isPaired) { { showUnpairLeftDialog = true } } else null,
-                    showPairAnother = false, // Don't show "Pair another one" for left sensor
+                    showPairAnother = false, // REMOVED: Pair another one button logic disabled
                     isConnected = leftConnected,
                     dataSampleCount = leftDataCount,
                     lastDataTime = leftLastDataTime,
@@ -272,6 +272,7 @@ fun PairingTabScreen() {
                     onPair = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = false) },
                     onPairAnother = { startPairing(PairingTarget.RIGHT_SENSOR, resetExisting = true) },
                     onUnpair = if (rightSensorState.isPaired) { { showUnpairRightDialog = true } } else null,
+                    showPairAnother = false, // REMOVED: Pair another one button logic disabled
                     isConnected = rightConnected,
                     dataSampleCount = rightDataCount,
                     lastDataTime = rightLastDataTime,

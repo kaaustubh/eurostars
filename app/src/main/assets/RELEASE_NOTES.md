@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.6(6)] - 2025-12-05
+
+### New Features
+- **Walk Mode Heatmap**: Real-time visualization of plantar pressure with radial gradients
+  - Heatmap dynamically reflects pressure intensity (kPa)
+  - Accurate taxel mapping for left and right feet
+- **Calibration Screens**: Dedicated screens for calibrating left and right foot sensors
+- **Session Management**:
+  - "Stop Session" dialog with options to Upload or Discard data
+  - Sessions are now uploaded in **CSV format** for easier analysis
+- **Session History**: Added "Gait Analysis" tab showing session history
+  - History accurately syncs with cloud storage
+  - Retry logic for failed uploads
+- **Anonymous Authentication**: Secure patient data uploads without requiring email login
+
+### Improvements
+- **BLE Optimization**: Connection priority set to LOW_POWER for improved battery life
+- **Connection Reliability**: Enhanced auto-reconnection and stability logic
+- **Data Accuracy**: Heatmap colors are calibrated to specific pressure thresholds (Blue to Red)
+
+### Technical
+- Migrated session data upload from JSON to CSV
+- Refactored session history to use Firebase Storage as the single source of truth
+- Implemented anonymous Firebase authentication for patient role
+
+---
+
 ## [0.0.5(5)] - 2025-11-24
 
 ### New Features
@@ -177,4 +204,3 @@ All notable changes to this project will be documented in this file.
 - Set version to 0.0.1
 
 ---
-
