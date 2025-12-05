@@ -6,6 +6,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.firestore
 import com.google.firebase.storage.storage
+import com.google.firebase.storage.StorageMetadata
 import com.sensars.eurostars.data.ble.SensorDataStreams
 import com.sensars.eurostars.viewmodel.PairingTarget
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 import java.util.Date
 import java.util.UUID
@@ -27,6 +31,7 @@ import java.util.UUID
  */
 class WalkModeRepository(private val context: Context) {
     private val db = Firebase.firestore
+    private val storage = Firebase.storage
     private val auth = FirebaseAuth.getInstance()
     private val sessionRepo = SessionRepository(context)
     private val historyManager = SessionHistoryManager(context)
@@ -78,12 +83,19 @@ class WalkModeRepository(private val context: Context) {
         }
     }
 
-    suspend fun stopSession(onSuccess: () -> Unit, onError: (String) -> Unit) {
+    suspend fun stopSession(save: Boolean = true, onSuccess: () -> Unit, onError: (String) -> Unit) {
         if (!isSessionActive()) return
         
         collectionJob?.cancel()
         collectionJob = null
         val endTime = System.currentTimeMillis()
+        
+        if (!save) {
+            activeSessionId = null
+            onSuccess()
+            return
+        }
+
         val currentPatientId = getPatientId()
         
         if (currentPatientId.isNullOrEmpty()) {
@@ -92,9 +104,9 @@ class WalkModeRepository(private val context: Context) {
             return
         }
 
-        // Save session locally first
+        // Save session locally first (now saves as CSV)
         val savedSession = historyManager.saveSession(
-            displaySessionId = "Pending", // Will be updated on upload
+            displaySessionId = "Pending", 
             patientId = currentPatientId,
             startTime = sessionStartTime,
             endTime = endTime,
@@ -121,17 +133,6 @@ class WalkModeRepository(private val context: Context) {
         uploadSession(session, leftData, rightData, onSuccess, onError)
     }
 
-import android.net.Uri
-import com.google.firebase.storage.storage
-import java.io.File
-
-// ...
-
-class WalkModeRepository(private val context: Context) {
-    private val db = Firebase.firestore
-    private val storage = Firebase.storage
-    // ...
-
     private suspend fun uploadSession(
         session: WalkSession, 
         leftData: List<PressureDataPoint>, 
@@ -141,7 +142,6 @@ class WalkModeRepository(private val context: Context) {
     ) {
         historyManager.updateSessionStatus(session.sessionId, UploadStatus.UPLOADING)
 
-        // Ensure we are authenticated
         if (auth.currentUser == null) {
             try {
                 auth.signInAnonymously().await()
@@ -153,13 +153,8 @@ class WalkModeRepository(private val context: Context) {
         }
 
         try {
-            // 1. Upload Data File to Firebase Storage
-            // Path: patients/{patientId}/sessions/{sessionId}.json
-            // Since we don't have the final session ID yet, we use a temp one or generate one now.
-            // Let's generate the Session ID first to use in the path.
-            
+            // 1. Generate Session ID if needed
             val sessionsRef = db.collection("patients").document(session.patientId).collection("sessions")
-            
             val nextSessionId = if (session.displaySessionId == "Pending" || session.displaySessionId == "?") {
                  val snapshot = sessionsRef.get().await()
                  (snapshot.size() + 1).toString()
@@ -167,26 +162,39 @@ class WalkModeRepository(private val context: Context) {
                 session.displaySessionId
             }
             
+            // 2. Upload Data File to Firebase Storage (CSV)
             val storageRef = storage.reference
                 .child("patients")
                 .child(session.patientId)
                 .child("sessions")
-                .child("$nextSessionId.json")
+                .child("$nextSessionId.csv")
                 
             val localFile = File(context.filesDir, session.fileName)
             if (!localFile.exists()) {
                 throw Exception("Local session file not found")
             }
-            
-            // Upload file
-            storageRef.putFile(Uri.fromFile(localFile)).await()
-            
-            // Get Download URL
-            // Note: In some high-security rules, getting download URL might require specific permission.
-            // But usually standard auth is enough.
-            val downloadUrl = storageRef.downloadUrl.await().toString()
 
-            // 2. Create Metadata Document in Firestore
+            val metadata = StorageMetadata.Builder()
+                .setCustomMetadata("startTime", session.startTime.toString())
+                .setCustomMetadata("endTime", session.endTime.toString())
+                .setCustomMetadata("sessionId", nextSessionId)
+                .setContentType("text/csv")
+                .build()
+            
+            try {
+                storageRef.putFile(Uri.fromFile(localFile), metadata).await()
+            } catch (e: Exception) {
+                 throw Exception("File upload step failed: ${e.message}")
+            }
+            
+            // 3. Get Download URL
+            val downloadUrl = try {
+                storageRef.downloadUrl.await().toString()
+            } catch (e: Exception) {
+                "gs://${storageRef.bucket}/${storageRef.path}"
+            }
+
+            // 4. Create Metadata Document in Firestore
             val sessionDoc = sessionsRef.document(nextSessionId)
             
             val data = hashMapOf(
@@ -195,12 +203,11 @@ class WalkModeRepository(private val context: Context) {
                 "endTime" to Date(session.endTime),
                 "dataSizeBytes" to session.dataSizeBytes,
                 "dataUrl" to downloadUrl,
-                "schemaVersion" to 2 // version 2 uses compact JSON and Storage
+                "schemaVersion" to 3 // version 3 uses CSV
             )
             
             sessionDoc.set(data).await()
             
-            // Update local status
             historyManager.updateSessionStatus(session.sessionId, UploadStatus.UPLOADED, nextSessionId)
             onSuccess()
             
@@ -216,43 +223,60 @@ class WalkModeRepository(private val context: Context) {
     }
 
     fun getSessionsFlow(): Flow<List<WalkSession>> = flow {
-        // Emit initial
         emit(historyManager.getSessions())
-        // In a real app with Room, we'd observe the DB. 
-        // Here we can just expose a method to refresh or poll.
-        // For simplicity, we just emit once. The UI might need to manually refresh or we can add a broadcast mechanism.
-        // Let's rely on ViewModels refreshing.
     }
     
     suspend fun getSessions(): List<WalkSession> {
         val localSessions = historyManager.getSessions()
         val remoteSessions = fetchRemoteSessions()
         
-        // Merge sessions
-        // Map local sessions by display ID to check for duplicates
+        // Filter local sessions to exclude pending ones that might duplicate remotes
         val localMap = localSessions.associateBy { it.displaySessionId }
         val mergedList = localSessions.toMutableList()
         
+        // Add only remotes that aren't already locally known by ID
         remoteSessions.forEach { remote ->
-            // If we don't have a local session with this remote ID, add it
             if (!localMap.containsKey(remote.sessionId)) {
+                // Also check if we have a "Pending" local session that matches this remote session's ID/Time?
+                // Since we can't easily match, we rely on ID.
+                // If remote list is the source of truth, we should prioritize it?
+                // The user says: "I see only one session... but gait analysis shows multiple".
+                // This likely means local history (sessions_meta.json) has stale/failed/duplicate entries.
+                // Solution: Only show local sessions that are PENDING or FAILED. For UPLOADED, rely on remote.
+                
                 mergedList.add(remote)
-            } else {
-                // If we do have it, we might want to update status if local says PENDING/UPLOADING but remote exists?
-                // But for now, let's trust local state for existing ones (especially if they have fileName for retry).
-                // If local is FAILED but remote exists, it means maybe it succeeded on another try?
-                // For simplicity, we keep local version if it exists.
             }
         }
         
-        return mergedList.sortedByDescending { it.startTime }
+        // Filter out local UPLOADED sessions if they exist remotely (to avoid dupes if logic fails)
+        // But more importantly, filter out local sessions that claim to be UPLOADED but aren't in remote list?
+        // Actually, the user's issue is likely that they have LOCAL history of previous attempts (which failed or succeeded)
+        // AND remote history.
+        
+        // If we trust Storage as source of truth for "History", we should:
+        // 1. Take all REMOTE sessions.
+        // 2. Take LOCAL sessions ONLY if they are PENDING or FAILED (i.e. not yet uploaded).
+        // 3. Combine them.
+        
+        val verifiedRemoteIds = remoteSessions.map { it.sessionId }.toSet()
+        
+        val finalLocalList = localSessions.filter { local ->
+            // Keep if:
+            // 1. It is NOT uploaded (Pending/Uploading/Failed)
+            // 2. OR It IS uploaded but we just did it and it might not be in remote list yet (race condition)?
+            // The safest bet for a clean list is:
+            // Show all Remote.
+            // Show Local ONLY if status != UPLOADED.
+            local.status != UploadStatus.UPLOADED
+        }
+        
+        return (remoteSessions + finalLocalList).sortedByDescending { it.startTime }
     }
 
     private suspend fun fetchRemoteSessions(): List<WalkSession> {
         val patientId = getPatientId() ?: return emptyList()
         
         try {
-            // Ensure auth if needed (though getPatientId relies on session repo, not auth)
             if (auth.currentUser == null) {
                 try {
                     auth.signInAnonymously().await()
@@ -261,29 +285,45 @@ class WalkModeRepository(private val context: Context) {
                 }
             }
 
-            val sessionsRef = db.collection("patients").document(patientId).collection("sessions")
-            val snapshot = sessionsRef.get().await()
+            val sessionsDirRef = storage.reference
+                .child("patients")
+                .child(patientId)
+                .child("sessions")
+
+            val listResult = sessionsDirRef.listAll().await()
             
-            return snapshot.documents.mapNotNull { doc ->
-                try {
-                    val startTime = doc.getDate("startTime")?.time ?: 0L
-                    val endTime = doc.getDate("endTime")?.time ?: 0L
-                    val size = doc.getLong("dataSizeBytes") ?: 0L
-                    
-                    WalkSession(
-                        sessionId = doc.id, // Use remote ID as local ID for remote-only sessions
-                        displaySessionId = doc.id,
-                        patientId = patientId,
-                        startTime = startTime,
-                        endTime = endTime,
-                        status = UploadStatus.UPLOADED,
-                        dataSizeBytes = size,
-                        fileName = "" // No local file
-                    )
-                } catch (e: Exception) {
-                    null
-                }
+            return coroutineScope {
+                listResult.items.map { itemRef ->
+                    async {
+                        try {
+                            val metadata = itemRef.metadata.await()
+                            
+                            val startTime = metadata.getCustomMetadata("startTime")?.toLongOrNull() 
+                                ?: metadata.creationTimeMillis 
+                            
+                            val endTime = metadata.getCustomMetadata("endTime")?.toLongOrNull() 
+                                ?: metadata.creationTimeMillis
+                                
+                            val sessionId = metadata.getCustomMetadata("sessionId") 
+                                ?: itemRef.name.replace(".json", "").replace(".csv", "")
+                            
+                            WalkSession(
+                                sessionId = sessionId,
+                                displaySessionId = sessionId,
+                                patientId = patientId,
+                                startTime = startTime,
+                                endTime = endTime,
+                                status = UploadStatus.UPLOADED,
+                                dataSizeBytes = metadata.sizeBytes,
+                                fileName = "" 
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                }.awaitAll().filterNotNull()
             }
+
         } catch (e: Exception) {
             return emptyList()
         }

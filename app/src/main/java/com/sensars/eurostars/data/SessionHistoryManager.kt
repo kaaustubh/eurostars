@@ -17,11 +17,7 @@ enum class UploadStatus {
 
 data class WalkSession(
     val sessionId: String, // Local unique ID (timestamp-based or UUID)
-    val displaySessionId: String, // The incrementing ID (1, 2, 3...) - assigned at upload or creation? 
-                                  // Problem: If upload fails, we don't know the remote ID yet. 
-                                  // Solution: Use local timestamp/UUID as key, and display "Pending" for remote ID until uploaded.
-                                  // OR: Just use local incrementing ID if we are the only source of truth. 
-                                  // Given the requirement "session id", let's persist the one we try to assign.
+    val displaySessionId: String, 
     val patientId: String,
     val startTime: Long,
     val endTime: Long,
@@ -42,15 +38,12 @@ class SessionHistoryManager(private val context: Context) {
         rightData: List<WalkModeRepository.PressureDataPoint>
     ): WalkSession = withContext(Dispatchers.IO) {
         
-        // 1. Save data to a file
-        val fileName = "session_${System.currentTimeMillis()}.json"
+        // 1. Save data to a CSV file
+        val fileName = "session_${System.currentTimeMillis()}.csv"
         val dataFile = File(context.filesDir, fileName)
         
-        val dataJson = JSONObject()
-        dataJson.put("left", serializeDataPoints(leftData))
-        dataJson.put("right", serializeDataPoints(rightData))
-        
-        dataFile.writeText(dataJson.toString())
+        val csvContent = generateCsvContent(leftData, rightData)
+        dataFile.writeText(csvContent)
         val sizeBytes = dataFile.length()
         
         // 2. Create session object
@@ -116,18 +109,9 @@ class SessionHistoryManager(private val context: Context) {
     }
 
     suspend fun getSessionData(fileName: String): Pair<List<WalkModeRepository.PressureDataPoint>, List<WalkModeRepository.PressureDataPoint>> = withContext(Dispatchers.IO) {
-        val file = File(context.filesDir, fileName)
-        if (!file.exists()) return@withContext Pair(emptyList(), emptyList())
-        
-        try {
-            val json = JSONObject(file.readText())
-            val left = parseDataPoints(json.getJSONArray("left"))
-            val right = parseDataPoints(json.getJSONArray("right"))
-            return@withContext Pair(left, right)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return@withContext Pair(emptyList(), emptyList())
-        }
+        // We no longer parse CSV back to objects since upload just uses the file directly.
+        // Returning empty lists to satisfy signature.
+        return@withContext Pair(emptyList(), emptyList())
     }
     
     private fun saveSessionsMeta(sessions: List<WalkSession>) {
@@ -147,40 +131,45 @@ class SessionHistoryManager(private val context: Context) {
         metaFile.writeText(jsonArray.toString())
     }
     
-    private fun serializeDataPoints(points: List<WalkModeRepository.PressureDataPoint>): JSONArray {
-        val arr = JSONArray()
-        points.forEach { p ->
-            // Compact format: array of [t, i, v] instead of object {t:_, i:_, v:_}
-            val pointArr = JSONArray()
-            pointArr.put(p.timestamp)
-            pointArr.put(p.taxelIndex)
-            pointArr.put(p.value)
-            arr.put(pointArr)
+    private fun generateCsvContent(
+        leftData: List<WalkModeRepository.PressureDataPoint>,
+        rightData: List<WalkModeRepository.PressureDataPoint>
+    ): String {
+        val sb = StringBuilder()
+        // Header
+        sb.append("timestamp,foot")
+        for (i in 1..18) sb.append(",taxel$i")
+        sb.append("\n")
+        
+        data class Event(val time: Long, val foot: String, val index: Int, val value: Long)
+        
+        val events = ArrayList<Event>(leftData.size + rightData.size)
+        leftData.forEach { events.add(Event(it.timestamp, "Left", it.taxelIndex, it.value)) }
+        rightData.forEach { events.add(Event(it.timestamp, "Right", it.taxelIndex, it.value)) }
+        
+        // Group by (timestamp, foot)
+        // We assume sensor sends frames where all taxels share the same timestamp (or close enough that we treat unique timestamps as frames)
+        val grouped = events.groupBy { Pair(it.time, it.foot) }.toSortedMap { a, b ->
+            val timeDiff = a.first.compareTo(b.first)
+            if (timeDiff != 0) timeDiff else a.second.compareTo(b.second)
         }
-        return arr
-    }
-    
-    private fun parseDataPoints(arr: JSONArray): List<WalkModeRepository.PressureDataPoint> {
-        val list = mutableListOf<WalkModeRepository.PressureDataPoint>()
-        for (i in 0 until arr.length()) {
-            val item = arr.get(i)
-            if (item is JSONArray) {
-                // Parse compact format [t, i, v]
-                list.add(WalkModeRepository.PressureDataPoint(
-                    timestamp = item.getLong(0),
-                    taxelIndex = item.getInt(1),
-                    value = item.getLong(2)
-                ))
-            } else if (item is JSONObject) {
-                // Backward compatibility for object format {t, i, v}
-                list.add(WalkModeRepository.PressureDataPoint(
-                    timestamp = item.getLong("t"),
-                    taxelIndex = item.getInt("i"),
-                    value = item.getLong("v")
-                ))
+        
+        grouped.forEach { (key, groupEvents) ->
+            val (time, foot) = key
+            val values = LongArray(18) // Default 0
+            groupEvents.forEach { event ->
+                if (event.index in 0..17) {
+                    values[event.index] = event.value
+                }
             }
+            
+            sb.append(time).append(",").append(foot)
+            for (v in values) {
+                sb.append(",").append(v)
+            }
+            sb.append("\n")
         }
-        return list
+        
+        return sb.toString()
     }
 }
-

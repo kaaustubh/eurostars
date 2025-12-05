@@ -115,6 +115,7 @@ fun WalkModeScreen(
     }
 
     var showStartDialog by remember { mutableStateOf(false) }
+    var showStopDialog by remember { mutableStateOf(false) }
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm:ss") }
 
     val scrollState = rememberScrollState()
@@ -152,16 +153,7 @@ fun WalkModeScreen(
                isLeftLegNeeded = isLeftLegNeeded,
                isRightLegNeeded = isRightLegNeeded,
                onStartRequested = { showStartDialog = true },
-               onStop = {
-                   walkModeViewModel.stopWalkMode(
-                       onSuccess = {
-                           Toast.makeText(context, "Session uploaded successfully", Toast.LENGTH_SHORT).show()
-                       },
-                       onError = { error ->
-                           Toast.makeText(context, "Upload failed: $error", Toast.LENGTH_LONG).show()
-                       }
-                   )
-               }
+               onStop = { showStopDialog = true }
            )
 
         HeatmapSection(
@@ -208,6 +200,51 @@ fun WalkModeScreen(
             dismissButton = {
                 TextButton(onClick = { showStartDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showStopDialog) {
+        AlertDialog(
+            onDismissRequest = { showStopDialog = false },
+            title = { Text("Stop Session?") },
+            text = {
+                Text("Do you want to upload this session or discard it?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showStopDialog = false
+                        walkModeViewModel.stopWalkMode(
+                            save = true,
+                            onSuccess = {
+                                Toast.makeText(context, "Session uploaded successfully", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { error ->
+                                Toast.makeText(context, "Upload failed: $error", Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                ) {
+                    Text("Upload")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showStopDialog = false
+                        walkModeViewModel.stopWalkMode(
+                            save = false,
+                            onSuccess = {
+                                Toast.makeText(context, "Session discarded", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = {}
+                        )
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Discard")
                 }
             }
         )
@@ -355,7 +392,7 @@ private fun WalkModeControls(
                 Button(
                     onClick = onStop,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
+                        containerColor = MaterialTheme.colorScheme.error
                     ),
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))

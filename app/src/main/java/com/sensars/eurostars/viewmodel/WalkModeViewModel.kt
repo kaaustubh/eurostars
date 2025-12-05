@@ -58,7 +58,7 @@ class WalkModeViewModel(application: Application) : AndroidViewModel(application
     /**
      * Stop Walk Mode session and upload data.
      */
-    fun stopWalkMode(onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun stopWalkMode(save: Boolean = true, onSuccess: () -> Unit, onError: (String) -> Unit) {
         if (!_isWalkModeActive.value) return
 
         _isWalkModeActive.value = false
@@ -67,6 +67,7 @@ class WalkModeViewModel(application: Application) : AndroidViewModel(application
 
         viewModelScope.launch {
             walkModeRepo.stopSession(
+                save = save,
                 onSuccess = {
                     _uploading.value = false
                     onSuccess()
