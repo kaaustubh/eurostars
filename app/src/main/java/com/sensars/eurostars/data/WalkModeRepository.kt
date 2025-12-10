@@ -275,7 +275,10 @@ class WalkModeRepository(private val context: Context) {
 
     private suspend fun fetchRemoteSessions(): List<WalkSession> {
         val patientId = getPatientId() ?: return emptyList()
-        
+        return getRemoteSessionsForPatient(patientId)
+    }
+
+    suspend fun getRemoteSessionsForPatient(patientId: String): List<WalkSession> {
         try {
             if (auth.currentUser == null) {
                 try {

@@ -28,7 +28,8 @@ import com.sensars.eurostars.viewmodel.PatientsViewModel
 
 @Composable
 fun PatientsScreen(
-    onAddPatient: () -> Unit
+    onAddPatient: () -> Unit,
+    onPatientClick: (String) -> Unit
 ) {
     val (query, setQuery) = remember { mutableStateOf("") }
     val (showAddPatientPopup, setShowAddPatientPopup) = remember { mutableStateOf(false) }
@@ -117,10 +118,12 @@ fun PatientsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                // Fetch full details for edit and open dialog
-                                viewModel.loadPatientForEdit(patient.patientId)
-                                setShowAddPatientPopup(true)
-                            }
+                                onPatientClick(patient.patientId)
+                            },
+                        onEditClick = {
+                            viewModel.loadPatientForEdit(patient.patientId)
+                            setShowAddPatientPopup(true)
+                        }
                     )
                 }
             }
