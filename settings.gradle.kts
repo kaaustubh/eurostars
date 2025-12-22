@@ -21,3 +21,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Sensars Eurostars"
 include(":app")
+include(":sensars-calibration")
+project(":sensars-calibration").projectDir = file("sensars-calibration-standalone/library")
+

@@ -10,7 +10,8 @@ import java.util.UUID
 /** Data classes for streamed sensor samples with sensor identification. */
 data class PressureSample(
     val taxelIndex: Int,
-    val value: Long,
+    val value: Long, // Raw sensor value
+    val pascalValue: Double? = null, // Calibrated value in Pascals (null if not yet calibrated)
     val timestampNanos: Long,
     val sensorSide: PairingTarget
 )

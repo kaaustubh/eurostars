@@ -1,8 +1,12 @@
 package com.sensars.eurostars.data.ble
 
 import android.content.Context
+import com.sensars.eurostars.calibration.TaxelCalibrator
 import com.sensars.eurostars.viewmodel.PairingTarget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
@@ -20,6 +24,19 @@ class SensorDataHandler(private val context: Context) {
 
     // Unified streams that combine both sensors
     private val unifiedStreams = SensorDataStreams()
+    
+    // Lazy initialize calibrator - loads calibration data from assets
+    private val calibrator: TaxelCalibrator? by lazy {
+        try {
+            TaxelCalibrator.fromAssets(context)
+        } catch (e: Exception) {
+            android.util.Log.e("SensorDataHandler", "Failed to load calibration data: ${e.message}", e)
+            null
+        }
+    }
+    
+    // Coroutine scope for calibration to run off main thread
+    private val calibrationScope = CoroutineScope(Dispatchers.Default)
     
     // State to accumulate IMU component values per sensor
     // This allows us to merge X, Y, Z components that arrive separately
@@ -125,11 +142,26 @@ class SensorDataHandler(private val context: Context) {
         streams: SensorDataStreams
     ): Boolean {
         val taxelIndex = taxelUuidToIndex[uuid] ?: return false
-        val pressureValue = SensorDecoders.decodeUnsignedInt(value)
-        val sample = PressureSample(taxelIndex, pressureValue, timestampNanos, sensorSide)
-        streams._pressure.tryEmit(sample)
-        // Also emit to unified stream
-        unifiedStreams._pressure.tryEmit(sample)
+        val rawPressureValue = SensorDecoders.decodeUnsignedInt(value)
+        
+        // Emit raw sample immediately (without calibrated value)
+        val rawSample = PressureSample(taxelIndex, rawPressureValue, null, timestampNanos, sensorSide)
+        streams._pressure.tryEmit(rawSample)
+        unifiedStreams._pressure.tryEmit(rawSample)
+        
+        // Perform calibration asynchronously and emit calibrated sample
+        calibrator?.let { cal ->
+            calibrationScope.launch {
+                try {
+                    val pascalValue = cal.calibrateTaxel(taxelIndex, rawPressureValue.toInt())
+                    val calibratedSample = PressureSample(taxelIndex, rawPressureValue, pascalValue, timestampNanos, sensorSide)
+                    streams._pressure.tryEmit(calibratedSample)
+                    unifiedStreams._pressure.tryEmit(calibratedSample)
+                } catch (e: Exception) {
+                    android.util.Log.e("SensorDataHandler", "Calibration failed for taxel $taxelIndex: ${e.message}", e)
+                }
+            }
+        }
         
         // Track which taxels have received data per sensor (for debugging if needed)
         val receivedTaxels = when (sensorSide) {

@@ -204,7 +204,8 @@ class BleRepository(private val context: Context) {
                         val v = SensorDecoders.decodeUnsignedInt(value)
                         // Note: Old code path doesn't have sensorSide, using LEFT_SENSOR as default
                         // This should only happen during transition period
-                        streams._pressure.tryEmit(PressureSample(idx, v, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
+                        // Calibration is now handled in SensorDataHandler, so pass null for pascalValue
+                        streams._pressure.tryEmit(PressureSample(idx, v, null, now, com.sensars.eurostars.viewmodel.PairingTarget.LEFT_SENSOR))
                     }
                     uuid in BleUuids.ACCEL_DATA_CHARS -> {
                         // Collect samples across 3 chars; emit per-char updates as triplet approx

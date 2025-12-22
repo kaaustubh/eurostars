@@ -51,7 +51,7 @@ class WalkModeRepository(private val context: Context) {
     data class PressureDataPoint(
         val timestamp: Long,
         val taxelIndex: Int,
-        val value: Long
+        val value: Double // Calibrated value in Pascals
     )
 
     fun isSessionActive(): Boolean = activeSessionId != null
@@ -64,18 +64,21 @@ class WalkModeRepository(private val context: Context) {
         sessionBuffer.leftPressure.clear()
         sessionBuffer.rightPressure.clear()
         
-        // Start collecting data
+        // Start collecting data - only store calibrated values
         collectionJob = CoroutineScope(Dispatchers.IO).launch {
             launch {
                 dataStreams.pressure.collect { sample ->
-                    val point = PressureDataPoint(sample.timestampNanos, sample.taxelIndex, sample.value)
-                    if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
-                        synchronized(sessionBuffer.leftPressure) {
-                            sessionBuffer.leftPressure.add(point)
-                        }
-                    } else {
-                        synchronized(sessionBuffer.rightPressure) {
-                            sessionBuffer.rightPressure.add(point)
+                    // Only store calibrated samples (pascalValue != null)
+                    if (sample.pascalValue != null) {
+                        val point = PressureDataPoint(sample.timestampNanos, sample.taxelIndex, sample.pascalValue)
+                        if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
+                            synchronized(sessionBuffer.leftPressure) {
+                                sessionBuffer.leftPressure.add(point)
+                            }
+                        } else {
+                            synchronized(sessionBuffer.rightPressure) {
+                                sessionBuffer.rightPressure.add(point)
+                            }
                         }
                     }
                 }

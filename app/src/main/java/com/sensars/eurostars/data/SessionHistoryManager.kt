@@ -141,7 +141,7 @@ class SessionHistoryManager(private val context: Context) {
         for (i in 1..18) sb.append(",taxel$i")
         sb.append("\n")
         
-        data class Event(val time: Long, val foot: String, val index: Int, val value: Long)
+        data class Event(val time: Long, val foot: String, val index: Int, val value: Double) // Changed to Double for Pascal values
         
         val events = ArrayList<Event>(leftData.size + rightData.size)
         leftData.forEach { events.add(Event(it.timestamp, "Left", it.taxelIndex, it.value)) }
@@ -156,7 +156,7 @@ class SessionHistoryManager(private val context: Context) {
         
         grouped.forEach { (key, groupEvents) ->
             val (time, foot) = key
-            val values = LongArray(18) // Default 0
+            val values = DoubleArray(18) // Default 0.0 for Pascal values
             groupEvents.forEach { event ->
                 if (event.index in 0..17) {
                     values[event.index] = event.value
