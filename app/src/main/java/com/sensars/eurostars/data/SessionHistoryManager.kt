@@ -38,27 +38,36 @@ class SessionHistoryManager(private val context: Context) {
         rightData: List<WalkModeRepository.PressureDataPoint>
     ): WalkSession = withContext(Dispatchers.IO) {
         
-        // 1. Save data to a CSV file
-        val fileName = "session_${System.currentTimeMillis()}.csv"
-        val dataFile = File(context.filesDir, fileName)
+        val timestamp = System.currentTimeMillis()
         
-        val csvContent = generateCsvContent(leftData, rightData)
-        dataFile.writeText(csvContent)
-        val sizeBytes = dataFile.length()
+        // 1. Save calibrated data to CSV file (internal storage)
+        val calibratedFileName = "session_${timestamp}_calibrated.csv"
+        val calibratedFile = File(context.filesDir, calibratedFileName)
+        val calibratedCsvContent = generateCsvContent(leftData, rightData, useCalibrated = true)
+        calibratedFile.writeText(calibratedCsvContent)
         
-        // 2. Create session object
+        // 2. Save raw data to CSV file (internal storage)
+        val rawFileName = "session_${timestamp}_raw.csv"
+        val rawFile = File(context.filesDir, rawFileName)
+        val rawCsvContent = generateCsvContent(leftData, rightData, useCalibrated = false)
+        rawFile.writeText(rawCsvContent)
+        
+        // Use calibrated file as the main file (for backward compatibility)
+        val sizeBytes = calibratedFile.length()
+        
+        // 3. Create session object
         val session = WalkSession(
-            sessionId = fileName, // Use filename as unique local ID
+            sessionId = calibratedFileName, // Use calibrated filename as unique local ID
             displaySessionId = displaySessionId,
             patientId = patientId,
             startTime = startTime,
             endTime = endTime,
             status = UploadStatus.PENDING,
             dataSizeBytes = sizeBytes,
-            fileName = fileName
+            fileName = calibratedFileName
         )
         
-        // 3. Update meta file
+        // 4. Update meta file
         val sessions = getSessions().toMutableList()
         sessions.add(0, session) // Add to top
         saveSessionsMeta(sessions)
@@ -133,19 +142,30 @@ class SessionHistoryManager(private val context: Context) {
     
     private fun generateCsvContent(
         leftData: List<WalkModeRepository.PressureDataPoint>,
-        rightData: List<WalkModeRepository.PressureDataPoint>
+        rightData: List<WalkModeRepository.PressureDataPoint>,
+        useCalibrated: Boolean = true
     ): String {
         val sb = StringBuilder()
         // Header
         sb.append("timestamp,foot")
-        for (i in 1..18) sb.append(",taxel$i")
+        if (useCalibrated) {
+            for (i in 1..18) sb.append(",taxel${i}_pascal")
+        } else {
+            for (i in 1..18) sb.append(",taxel${i}_raw")
+        }
         sb.append("\n")
         
-        data class Event(val time: Long, val foot: String, val index: Int, val value: Double) // Changed to Double for Pascal values
+        data class Event(val time: Long, val foot: String, val index: Int, val value: Number)
         
         val events = ArrayList<Event>(leftData.size + rightData.size)
-        leftData.forEach { events.add(Event(it.timestamp, "Left", it.taxelIndex, it.value)) }
-        rightData.forEach { events.add(Event(it.timestamp, "Right", it.taxelIndex, it.value)) }
+        leftData.forEach { 
+            val value = if (useCalibrated) it.calibratedValue else it.rawValue.toDouble()
+            events.add(Event(it.timestamp, "Left", it.taxelIndex, value))
+        }
+        rightData.forEach { 
+            val value = if (useCalibrated) it.calibratedValue else it.rawValue.toDouble()
+            events.add(Event(it.timestamp, "Right", it.taxelIndex, value))
+        }
         
         // Group by (timestamp, foot)
         // We assume sensor sends frames where all taxels share the same timestamp (or close enough that we treat unique timestamps as frames)
@@ -156,10 +176,10 @@ class SessionHistoryManager(private val context: Context) {
         
         grouped.forEach { (key, groupEvents) ->
             val (time, foot) = key
-            val values = DoubleArray(18) // Default 0.0 for Pascal values
+            val values = DoubleArray(18) // Default 0.0
             groupEvents.forEach { event ->
                 if (event.index in 0..17) {
-                    values[event.index] = event.value
+                    values[event.index] = event.value.toDouble()
                 }
             }
             

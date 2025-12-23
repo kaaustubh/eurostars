@@ -28,9 +28,12 @@ class SensorDataHandler(private val context: Context) {
     // Lazy initialize calibrator - loads calibration data from assets
     private val calibrator: TaxelCalibrator? by lazy {
         try {
-            TaxelCalibrator.fromAssets(context)
+            val cal = TaxelCalibrator.fromAssets(context)
+            android.util.Log.d("SensorDataHandler", "Calibration data loaded successfully")
+            cal
         } catch (e: Exception) {
             android.util.Log.e("SensorDataHandler", "Failed to load calibration data: ${e.message}", e)
+            e.printStackTrace()
             null
         }
     }
@@ -150,15 +153,21 @@ class SensorDataHandler(private val context: Context) {
         unifiedStreams._pressure.tryEmit(rawSample)
         
         // Perform calibration asynchronously and emit calibrated sample
+        if (calibrator == null) {
+            android.util.Log.w("SensorDataHandler", "Calibrator is null, cannot calibrate taxel $taxelIndex")
+        }
         calibrator?.let { cal ->
             calibrationScope.launch {
                 try {
-                    val pascalValue = cal.calibrateTaxel(taxelIndex, rawPressureValue.toInt())
+                    val rawInt = rawPressureValue.toInt()
+                    val pascalValue = cal.calibrateTaxel(taxelIndex, rawInt)
+                    android.util.Log.d("SensorDataHandler", "Taxel $taxelIndex: raw=$rawInt, calibrated=$pascalValue Pa")
                     val calibratedSample = PressureSample(taxelIndex, rawPressureValue, pascalValue, timestampNanos, sensorSide)
                     streams._pressure.tryEmit(calibratedSample)
                     unifiedStreams._pressure.tryEmit(calibratedSample)
                 } catch (e: Exception) {
                     android.util.Log.e("SensorDataHandler", "Calibration failed for taxel $taxelIndex: ${e.message}", e)
+                    e.printStackTrace()
                 }
             }
         }

@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sensars.eurostars.data.ble.SensorConnectionManager
+import com.sensars.eurostars.ui.components.HeatmapUtils
 import com.sensars.eurostars.viewmodel.PairingTarget
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -29,8 +30,8 @@ fun SensorDataDisplaySection(
 ) {
     val dataHandler = connectionManager.getDataHandler()
     
-    // State for left sensor data
-    var leftPressures by remember { mutableStateOf<Map<Int, Long>>(emptyMap()) }
+    // State for left sensor data (calibrated Pascal values)
+    var leftPressures by remember { mutableStateOf<Map<Int, Double?>>(emptyMap()) }
     var leftAccelX by remember { mutableStateOf<Float?>(null) }
     var leftAccelY by remember { mutableStateOf<Float?>(null) }
     var leftAccelZ by remember { mutableStateOf<Float?>(null) }
@@ -40,8 +41,8 @@ fun SensorDataDisplaySection(
     var leftTemp by remember { mutableStateOf<Float?>(null) }
     var leftTime by remember { mutableStateOf<Long?>(null) }
     
-    // State for right sensor data
-    var rightPressures by remember { mutableStateOf<Map<Int, Long>>(emptyMap()) }
+    // State for right sensor data (calibrated Pascal values)
+    var rightPressures by remember { mutableStateOf<Map<Int, Double?>>(emptyMap()) }
     var rightAccelX by remember { mutableStateOf<Float?>(null) }
     var rightAccelY by remember { mutableStateOf<Float?>(null) }
     var rightAccelZ by remember { mutableStateOf<Float?>(null) }
@@ -64,8 +65,8 @@ fun SensorDataDisplaySection(
                 launch {
                     try {
                         pressureFlow.collect { sample ->
-                            if (leftConnected) { // Check connection state before updating
-                                leftPressures = leftPressures + (sample.taxelIndex to sample.value)
+                            if (leftConnected && sample.pascalValue != null) { // Only store calibrated values
+                                leftPressures = leftPressures + (sample.taxelIndex to sample.pascalValue)
                             }
                         }
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -158,8 +159,8 @@ fun SensorDataDisplaySection(
                 launch {
                     try {
                         pressureFlow.collect { sample ->
-                            if (rightConnected) { // Check connection state before updating
-                                rightPressures = rightPressures + (sample.taxelIndex to sample.value)
+                            if (rightConnected && sample.pascalValue != null) { // Only store calibrated values
+                                rightPressures = rightPressures + (sample.taxelIndex to sample.pascalValue)
                             }
                         }
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -304,7 +305,7 @@ fun SensorDataDisplaySection(
 @Composable
 private fun SensorDataCard(
     title: String,
-    pressures: Map<Int, Long>,
+    pressures: Map<Int, Double?>, // Calibrated Pascal values
     accelX: Float?,
     accelY: Float?,
     accelZ: Float?,
@@ -349,12 +350,23 @@ private fun SensorDataCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     (0..17).forEach { index ->
-                        val value = pressures[index] ?: 0L
+                        val pascalValue = pressures[index]
+                        val hasValue = pascalValue != null && pascalValue > 0
+                        val displayText = if (hasValue && pascalValue != null) {
+                            // Format with appropriate precision based on value size
+                            when {
+                                pascalValue < 1.0 -> String.format("%.2f", pascalValue) // e.g., 0.50 (2 decimals for very small)
+                                pascalValue < 10.0 -> String.format("%.1f", pascalValue) // e.g., 7.4 (1 decimal for small)
+                                else -> String.format("%.0f", pascalValue) // e.g., 15, 100 (no decimals for larger)
+                            }
+                        } else {
+                            "-"
+                        }
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(
-                                    color = if (value > 0) 
+                                    color = if (hasValue) 
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                                     else 
                                         MaterialTheme.colorScheme.surfaceVariant,
@@ -364,7 +376,7 @@ private fun SensorDataCard(
                             contentAlignment = androidx.compose.ui.Alignment.Center
                         ) {
                             Text(
-                                text = if (value > 0) value.toString() else "-",
+                                text = if (hasValue) "${displayText}Pa" else displayText,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 8.sp,
                                 color = MaterialTheme.colorScheme.onSurface

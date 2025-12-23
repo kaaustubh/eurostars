@@ -51,7 +51,8 @@ class WalkModeRepository(private val context: Context) {
     data class PressureDataPoint(
         val timestamp: Long,
         val taxelIndex: Int,
-        val value: Double // Calibrated value in Pascals
+        val rawValue: Long, // Raw sensor value
+        val calibratedValue: Double // Calibrated value in Pascals
     )
 
     fun isSessionActive(): Boolean = activeSessionId != null
@@ -64,21 +65,25 @@ class WalkModeRepository(private val context: Context) {
         sessionBuffer.leftPressure.clear()
         sessionBuffer.rightPressure.clear()
         
-        // Start collecting data - only store calibrated values
+        // Start collecting data - store both raw and calibrated values
         collectionJob = CoroutineScope(Dispatchers.IO).launch {
             launch {
                 dataStreams.pressure.collect { sample ->
-                    // Only store calibrated samples (pascalValue != null)
-                    if (sample.pascalValue != null) {
-                        val point = PressureDataPoint(sample.timestampNanos, sample.taxelIndex, sample.pascalValue)
-                        if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
-                            synchronized(sessionBuffer.leftPressure) {
-                                sessionBuffer.leftPressure.add(point)
-                            }
-                        } else {
-                            synchronized(sessionBuffer.rightPressure) {
-                                sessionBuffer.rightPressure.add(point)
-                            }
+                    // Store both raw and calibrated values for testing
+                    // Store even if calibrated value is null (will use raw value)
+                    val point = PressureDataPoint(
+                        timestamp = sample.timestampNanos,
+                        taxelIndex = sample.taxelIndex,
+                        rawValue = sample.value,
+                        calibratedValue = sample.pascalValue ?: 0.0
+                    )
+                    if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
+                        synchronized(sessionBuffer.leftPressure) {
+                            sessionBuffer.leftPressure.add(point)
+                        }
+                    } else {
+                        synchronized(sessionBuffer.rightPressure) {
+                            sessionBuffer.rightPressure.add(point)
                         }
                     }
                 }

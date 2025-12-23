@@ -65,5 +65,13 @@ object HeatmapUtils {
             else -> 1.0f                                     // 1.0 for red
         }.coerceIn(0.4f, 1.0f)
     }
+    
+    /**
+     * Convert Pascal value to kPa.
+     * 1 kPa = 1000 Pa
+     */
+    fun pascalToKpa(pascalValue: Double): Float {
+        return (pascalValue * 0.001).toFloat()
+    }
 }
 
