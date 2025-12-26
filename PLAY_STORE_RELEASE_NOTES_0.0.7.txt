@@ -1,0 +1,11 @@
+Release 0.0.7:
+
+New Features:
+- Session gait analysis detail screen for clinician and patient roles (tap a session to open).
+- Session CSV v2 includes IMU (accelerometer + gyroscope) alongside pressure.
+
+Improvements:
+- Patient gait analysis detail is full-screen (tabs/header hidden) with back navigation.
+- Chart indicator stays within the bar; 0 values render at the bar start.
+
+

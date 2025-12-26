@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.7(7)] - 2025-12-26
+
+### New Features
+- **Clinician gait analysis (per session)**: Tap a session to open a dedicated gait analysis screen with key metrics and CoP trace.
+- **Patient gait analysis (per session)**: Patient session history now opens the same gait analysis detail screen.
+- **Session CSV v2 (IMU included)**: Walk sessions now record accelerometer + gyroscope streams alongside pressure in the session CSV.
+
+### Improvements
+- **Patient UX**: Gait analysis detail screen is full-screen (tabs and patient header hidden) with a back button.
+- **Charts**: Metric indicator is clamped to the bar; \(0\) values render at the bar start.
+
+### Technical
+- Added patient-side navigation route for gait analysis details (reusing existing gait analysis screen)
+- Set version to 0.0.7(7) with versionCode 7
+
+---
+
 ## [0.0.6(6)] - 2025-12-05
 
 ### New Features
