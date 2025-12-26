@@ -25,23 +25,30 @@ fun PatientHomeScreen(
     
     // Child navController for patient dashboard tabs
     val dashboardNav = rememberNavController()
+    val dashboardBackStackEntry by dashboardNav.currentBackStackEntryAsState()
+    val dashboardRoute = dashboardBackStackEntry?.destination?.route.orEmpty()
+    val isGaitAnalysisDetail = dashboardRoute.startsWith("gait_analysis_session")
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Patient") },
-                actions = {
-                    IconButton(onClick = { showLogoutConfirm = true }) {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Logout"
-                        )
+            if (!isGaitAnalysisDetail) {
+                TopAppBar(
+                    title = { Text("Patient") },
+                    actions = {
+                        IconButton(onClick = { showLogoutConfirm = true }) {
+                            Icon(
+                                imageVector = Icons.Default.ExitToApp,
+                                contentDescription = "Logout"
+                            )
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         bottomBar = {
-            PatientBottomBar(navController = dashboardNav)
+            if (!isGaitAnalysisDetail) {
+                PatientBottomBar(navController = dashboardNav)
+            }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {

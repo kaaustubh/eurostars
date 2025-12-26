@@ -1,6 +1,7 @@
 package com.sensars.eurostars.ui.screens.patient.gaitanalysis
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,7 +24,9 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun GaitAnalysisScreen() {
+fun GaitAnalysisScreen(
+    onSessionClick: (patientId: String, sessionStartTime: Long) -> Unit
+) {
     val viewModel = gaitAnalysisViewModel()
     val sessions by viewModel.sessions.collectAsState()
     val loading by viewModel.loading.collectAsState()
@@ -60,7 +63,8 @@ fun GaitAnalysisScreen() {
         } else {
             SessionTable(
                 sessions = sessions,
-                onRetry = { viewModel.retryUpload(it) }
+                onRetry = { viewModel.retryUpload(it) },
+                onSessionClick = onSessionClick
             )
         }
     }
@@ -69,7 +73,8 @@ fun GaitAnalysisScreen() {
 @Composable
 fun SessionTable(
     sessions: List<WalkSession>,
-    onRetry: (String) -> Unit
+    onRetry: (String) -> Unit,
+    onSessionClick: (patientId: String, sessionStartTime: Long) -> Unit
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -94,7 +99,13 @@ fun SessionTable(
 
             LazyColumn {
                 items(sessions) { session ->
-                    SessionRow(session, onRetry)
+                    SessionRow(
+                        session = session,
+                        onRetry = onRetry,
+                        onClick = {
+                            onSessionClick(session.patientId, session.startTime)
+                        }
+                    )
                     Divider()
                 }
             }
@@ -114,7 +125,8 @@ fun SessionTable(
 @Composable
 fun SessionRow(
     session: WalkSession,
-    onRetry: (String) -> Unit
+    onRetry: (String) -> Unit,
+    onClick: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
     val startStr = dateFormat.format(Date(session.startTime))
@@ -125,6 +137,7 @@ fun SessionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = session.status == UploadStatus.UPLOADED, onClick = onClick)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically

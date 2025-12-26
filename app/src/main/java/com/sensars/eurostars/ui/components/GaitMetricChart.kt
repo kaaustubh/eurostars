@@ -85,7 +85,17 @@ fun GaitMetricChart(
                         drawZone(Color.Red, config.yellowMax2, config.maxValue, config.minValue, config.maxValue, barWidth, barHeight)
 
                         // Draw patient's value indicator (white line) - made thicker
-                        val patientX = ((patientValue - config.minValue) / (config.maxValue - config.minValue)).toFloat() * barWidth
+                        val range = (config.maxValue - config.minValue)
+                        val valueForIndicator = when {
+                            // Special-case: when value is 0, always show it at the start of the bar (per UX request)
+                            patientValue == 0.0 -> config.minValue
+                            else -> patientValue.coerceIn(config.minValue, config.maxValue)
+                        }
+                        val patientX = if (range <= 0.0) {
+                            0f
+                        } else {
+                            ((valueForIndicator - config.minValue) / range).toFloat() * barWidth
+                        }
                         drawLine(
                             color = Color.White,
                             start = Offset(patientX, 0f),
