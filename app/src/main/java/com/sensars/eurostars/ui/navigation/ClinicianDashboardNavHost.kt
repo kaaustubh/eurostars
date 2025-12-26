@@ -10,6 +10,7 @@ import androidx.navigation.NavType
 import androidx.compose.material3.Text
 import com.sensars.eurostars.ui.screens.clinician.dashboard.ClinicianTab
 import com.sensars.eurostars.ui.screens.clinician.patients_tab.PatientSessionsScreen
+import com.sensars.eurostars.ui.screens.clinician.patients_tab.ClinicianGaitAnalysisScreen
 
 @Composable
 fun ClinicianDashboardNavHost(navController: NavHostController) {
@@ -36,6 +37,25 @@ fun ClinicianDashboardNavHost(navController: NavHostController) {
             val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
             PatientSessionsScreen(
                 patientId = patientId,
+                onBack = { navController.popBackStack() },
+                onSessionClick = { sessionStartTime ->
+                    navController.navigate("gait_analysis/$patientId/$sessionStartTime")
+                }
+            )
+        }
+        
+        composable(
+            route = "gait_analysis/{patientId}/{sessionStartTime}",
+            arguments = listOf(
+                navArgument("patientId") { type = NavType.StringType },
+                navArgument("sessionStartTime") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
+            val sessionStartTime = backStackEntry.arguments?.getLong("sessionStartTime") ?: return@composable
+            ClinicianGaitAnalysisScreen(
+                patientId = patientId,
+                sessionStartTime = sessionStartTime,
                 onBack = { navController.popBackStack() }
             )
         }

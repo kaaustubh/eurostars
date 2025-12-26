@@ -1,6 +1,7 @@
 package com.sensars.eurostars.ui.screens.clinician.patients_tab
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,7 +27,8 @@ import java.util.Locale
 @Composable
 fun PatientSessionsScreen(
     patientId: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSessionClick: (Long) -> Unit
 ) {
     val viewModel = clinicianPatientSessionsViewModel(patientId)
     val sessions by viewModel.sessions.collectAsState()
@@ -67,7 +69,10 @@ fun PatientSessionsScreen(
                     CircularProgressIndicator()
                 }
             } else {
-                SessionTable(sessions = sessions)
+                SessionTable(
+                    sessions = sessions,
+                    onSessionClick = onSessionClick
+                )
             }
         }
     }
@@ -75,7 +80,8 @@ fun PatientSessionsScreen(
 
 @Composable
 fun SessionTable(
-    sessions: List<WalkSession>
+    sessions: List<WalkSession>,
+    onSessionClick: (Long) -> Unit
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -99,7 +105,10 @@ fun SessionTable(
 
             LazyColumn {
                 items(sessions) { session ->
-                    SessionRow(session)
+                    SessionRow(
+                        session = session,
+                        onClick = { onSessionClick(session.startTime) }
+                    )
                     Divider()
                 }
             }
@@ -118,7 +127,8 @@ fun SessionTable(
 
 @Composable
 fun SessionRow(
-    session: WalkSession
+    session: WalkSession,
+    onClick: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
     val startStr = dateFormat.format(Date(session.startTime))
@@ -129,6 +139,7 @@ fun SessionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically

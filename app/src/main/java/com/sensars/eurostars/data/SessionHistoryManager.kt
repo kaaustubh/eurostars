@@ -35,36 +35,36 @@ class SessionHistoryManager(private val context: Context) {
         startTime: Long,
         endTime: Long,
         leftData: List<WalkModeRepository.PressureDataPoint>,
-        rightData: List<WalkModeRepository.PressureDataPoint>
+        rightData: List<WalkModeRepository.PressureDataPoint>,
+        leftAccel: List<WalkModeRepository.ImuDataPoint> = emptyList(),
+        rightAccel: List<WalkModeRepository.ImuDataPoint> = emptyList(),
+        leftGyro: List<WalkModeRepository.ImuDataPoint> = emptyList(),
+        rightGyro: List<WalkModeRepository.ImuDataPoint> = emptyList()
     ): WalkSession = withContext(Dispatchers.IO) {
         
         val timestamp = System.currentTimeMillis()
         
         // 1. Save calibrated data to CSV file (internal storage)
-        val calibratedFileName = "session_${timestamp}_calibrated.csv"
-        val calibratedFile = File(context.filesDir, calibratedFileName)
-        val calibratedCsvContent = generateCsvContent(leftData, rightData, useCalibrated = true)
-        calibratedFile.writeText(calibratedCsvContent)
+        val fileName = "session_${timestamp}.csv"
+        val dataFile = File(context.filesDir, fileName)
+        val csvContent = generateCsvContent(
+            leftData, rightData, 
+            leftAccel, rightAccel, 
+            leftGyro, rightGyro
+        )
+        dataFile.writeText(csvContent)
+        val sizeBytes = dataFile.length()
         
-        // 2. Save raw data to CSV file (internal storage)
-        val rawFileName = "session_${timestamp}_raw.csv"
-        val rawFile = File(context.filesDir, rawFileName)
-        val rawCsvContent = generateCsvContent(leftData, rightData, useCalibrated = false)
-        rawFile.writeText(rawCsvContent)
-        
-        // Use calibrated file as the main file (for backward compatibility)
-        val sizeBytes = calibratedFile.length()
-        
-        // 3. Create session object
+        // 2. Create session object
         val session = WalkSession(
-            sessionId = calibratedFileName, // Use calibrated filename as unique local ID
+            sessionId = fileName, // Use filename as unique local ID
             displaySessionId = displaySessionId,
             patientId = patientId,
             startTime = startTime,
             endTime = endTime,
             status = UploadStatus.PENDING,
             dataSizeBytes = sizeBytes,
-            fileName = calibratedFileName
+            fileName = fileName
         )
         
         // 4. Update meta file
@@ -143,32 +143,52 @@ class SessionHistoryManager(private val context: Context) {
     private fun generateCsvContent(
         leftData: List<WalkModeRepository.PressureDataPoint>,
         rightData: List<WalkModeRepository.PressureDataPoint>,
-        useCalibrated: Boolean = true
+        leftAccel: List<WalkModeRepository.ImuDataPoint>,
+        rightAccel: List<WalkModeRepository.ImuDataPoint>,
+        leftGyro: List<WalkModeRepository.ImuDataPoint>,
+        rightGyro: List<WalkModeRepository.ImuDataPoint>
     ): String {
         val sb = StringBuilder()
         // Header
         sb.append("timestamp,foot")
-        if (useCalibrated) {
-            for (i in 1..18) sb.append(",taxel${i}_pascal")
-        } else {
-            for (i in 1..18) sb.append(",taxel${i}_raw")
-        }
+        for (i in 1..18) sb.append(",taxel${i}_kpa")
+        sb.append(",accel_x,accel_y,accel_z")
+        sb.append(",gyro_x,gyro_y,gyro_z")
         sb.append("\n")
         
-        data class Event(val time: Long, val foot: String, val index: Int, val value: Number)
+        data class Event(
+            val time: Long, 
+            val foot: String, 
+            val type: String, // "pressure", "accel", "gyro"
+            val index: Int = -1, 
+            val value: Double = 0.0,
+            val x: Float = 0f,
+            val y: Float = 0f,
+            val z: Float = 0f
+        )
         
-        val events = ArrayList<Event>(leftData.size + rightData.size)
+        val events = mutableListOf<Event>()
+        
         leftData.forEach { 
-            val value = if (useCalibrated) it.calibratedValue else it.rawValue.toDouble()
-            events.add(Event(it.timestamp, "Left", it.taxelIndex, value))
+            events.add(Event(it.timestamp, "Left", "pressure", it.taxelIndex, it.calibratedValue))
         }
         rightData.forEach { 
-            val value = if (useCalibrated) it.calibratedValue else it.rawValue.toDouble()
-            events.add(Event(it.timestamp, "Right", it.taxelIndex, value))
+            events.add(Event(it.timestamp, "Right", "pressure", it.taxelIndex, it.calibratedValue))
+        }
+        leftAccel.forEach {
+            events.add(Event(it.timestamp, "Left", "accel", x = it.x, y = it.y, z = it.z))
+        }
+        rightAccel.forEach {
+            events.add(Event(it.timestamp, "Right", "accel", x = it.x, y = it.y, z = it.z))
+        }
+        leftGyro.forEach {
+            events.add(Event(it.timestamp, "Left", "gyro", x = it.x, y = it.y, z = it.z))
+        }
+        rightGyro.forEach {
+            events.add(Event(it.timestamp, "Right", "gyro", x = it.x, y = it.y, z = it.z))
         }
         
         // Group by (timestamp, foot)
-        // We assume sensor sends frames where all taxels share the same timestamp (or close enough that we treat unique timestamps as frames)
         val grouped = events.groupBy { Pair(it.time, it.foot) }.toSortedMap { a, b ->
             val timeDiff = a.first.compareTo(b.first)
             if (timeDiff != 0) timeDiff else a.second.compareTo(b.second)
@@ -176,17 +196,24 @@ class SessionHistoryManager(private val context: Context) {
         
         grouped.forEach { (key, groupEvents) ->
             val (time, foot) = key
-            val values = DoubleArray(18) // Default 0.0
+            val pressureValues = DoubleArray(18)
+            var ax = 0f; var ay = 0f; var az = 0f
+            var gx = 0f; var gy = 0f; var gz = 0f
+            
             groupEvents.forEach { event ->
-                if (event.index in 0..17) {
-                    values[event.index] = event.value.toDouble()
+                when (event.type) {
+                    "pressure" -> if (event.index in 0..17) pressureValues[event.index] = event.value
+                    "accel" -> { ax = event.x; ay = event.y; az = event.z }
+                    "gyro" -> { gx = event.x; gy = event.y; gz = event.z }
                 }
             }
             
             sb.append(time).append(",").append(foot)
-            for (v in values) {
+            for (v in pressureValues) {
                 sb.append(",").append(v)
             }
+            sb.append(",").append(ax).append(",").append(ay).append(",").append(az)
+            sb.append(",").append(gx).append(",").append(gy).append(",").append(gz)
             sb.append("\n")
         }
         

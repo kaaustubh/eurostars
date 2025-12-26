@@ -46,6 +46,10 @@ class WalkModeRepository(private val context: Context) {
     data class SessionBuffer(
         val leftPressure: MutableList<PressureDataPoint> = mutableListOf(),
         val rightPressure: MutableList<PressureDataPoint> = mutableListOf(),
+        val leftAccel: MutableList<ImuDataPoint> = mutableListOf(),
+        val rightAccel: MutableList<ImuDataPoint> = mutableListOf(),
+        val leftGyro: MutableList<ImuDataPoint> = mutableListOf(),
+        val rightGyro: MutableList<ImuDataPoint> = mutableListOf()
     )
     
     data class PressureDataPoint(
@@ -53,6 +57,13 @@ class WalkModeRepository(private val context: Context) {
         val taxelIndex: Int,
         val rawValue: Long, // Raw sensor value
         val calibratedValue: Double // Calibrated value in Pascals
+    )
+
+    data class ImuDataPoint(
+        val timestamp: Long,
+        val x: Float,
+        val y: Float,
+        val z: Float
     )
 
     fun isSessionActive(): Boolean = activeSessionId != null
@@ -64,13 +75,16 @@ class WalkModeRepository(private val context: Context) {
         sessionStartTime = System.currentTimeMillis()
         sessionBuffer.leftPressure.clear()
         sessionBuffer.rightPressure.clear()
+        sessionBuffer.leftAccel.clear()
+        sessionBuffer.rightAccel.clear()
+        sessionBuffer.leftGyro.clear()
+        sessionBuffer.rightGyro.clear()
         
         // Start collecting data - store both raw and calibrated values
         collectionJob = CoroutineScope(Dispatchers.IO).launch {
+            // Pressure collection
             launch {
                 dataStreams.pressure.collect { sample ->
-                    // Store both raw and calibrated values for testing
-                    // Store even if calibrated value is null (will use raw value)
                     val point = PressureDataPoint(
                         timestamp = sample.timestampNanos,
                         taxelIndex = sample.taxelIndex,
@@ -84,6 +98,43 @@ class WalkModeRepository(private val context: Context) {
                     } else {
                         synchronized(sessionBuffer.rightPressure) {
                             sessionBuffer.rightPressure.add(point)
+                        }
+                    }
+                }
+            }
+            
+            // Accelerometer collection
+            launch {
+                dataStreams.accel.collect { sample ->
+                    // Only store if all components are present (not NaN)
+                    if (!sample.x.isNaN() && !sample.y.isNaN() && !sample.z.isNaN()) {
+                        val point = ImuDataPoint(sample.timestampNanos, sample.x, sample.y, sample.z)
+                        if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
+                            synchronized(sessionBuffer.leftAccel) {
+                                sessionBuffer.leftAccel.add(point)
+                            }
+                        } else {
+                            synchronized(sessionBuffer.rightAccel) {
+                                sessionBuffer.rightAccel.add(point)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Gyroscope collection
+            launch {
+                dataStreams.gyro.collect { sample ->
+                    if (!sample.x.isNaN() && !sample.y.isNaN() && !sample.z.isNaN()) {
+                        val point = ImuDataPoint(sample.timestampNanos, sample.x, sample.y, sample.z)
+                        if (sample.sensorSide == PairingTarget.LEFT_SENSOR) {
+                            synchronized(sessionBuffer.leftGyro) {
+                                sessionBuffer.leftGyro.add(point)
+                            }
+                        } else {
+                            synchronized(sessionBuffer.rightGyro) {
+                                sessionBuffer.rightGyro.add(point)
+                            }
                         }
                     }
                 }
@@ -119,7 +170,11 @@ class WalkModeRepository(private val context: Context) {
             startTime = sessionStartTime,
             endTime = endTime,
             leftData = sessionBuffer.leftPressure,
-            rightData = sessionBuffer.rightPressure
+            rightData = sessionBuffer.rightPressure,
+            leftAccel = sessionBuffer.leftAccel,
+            rightAccel = sessionBuffer.rightAccel,
+            leftGyro = sessionBuffer.leftGyro,
+            rightGyro = sessionBuffer.rightGyro
         )
 
         // Attempt upload
