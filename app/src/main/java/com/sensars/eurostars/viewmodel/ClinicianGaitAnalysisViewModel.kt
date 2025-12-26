@@ -155,11 +155,11 @@ class ClinicianGaitAnalysisViewModel(
                 calculateCoP(parsedData)
                 
                 // TODO: Calculate other metrics when formulas are available
-                // For now, set placeholder values for display
-                _lateralCenterOfMass.value = 0.3 // Placeholder
-                _extrapolatedCenterOfMass.value = 0.4 // Placeholder
-                _marginOfStability.value = 0.15 // Placeholder
-                _balance.value = 0.85 // Placeholder
+                // Dummy/placeholder metrics (hidden for now)
+                // _lateralCenterOfMass.value = 0.3 // Placeholder
+                // _extrapolatedCenterOfMass.value = 0.4 // Placeholder
+                // _marginOfStability.value = 0.15 // Placeholder
+                // _balance.value = 0.85 // Placeholder
 
             } catch (e: Exception) {
                 _error.value = "Failed to load session data: ${e.message}"
