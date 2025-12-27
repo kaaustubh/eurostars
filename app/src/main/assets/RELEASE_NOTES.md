@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.7(8)] - 2025-12-26
+
+### Improvements
+- **BLE Scanning**: Removed UUID filtering during device scanning to detect all BLE devices (helps discover new sensor variants)
+
+### Technical
+- Commented out service UUID filter in BleRepository.scanForSensors() for broader device discovery
+- Set version to 0.0.7(8) with versionCode 8
+
+---
+
 ## [0.0.7(7)] - 2025-12-26
 
 ### New Features

@@ -50,9 +50,11 @@ class BleRepository(private val context: Context) {
             close(IllegalStateException("Bluetooth is off"))
             return@callbackFlow
         }
-        val filters = listOf(
-            ScanFilter.Builder().setServiceUuid(ParcelUuid(BleUuids.ADVERTISED_SERVICE)).build()
-        )
+        // TODO: UUID filtering commented out to scan for all BLE devices
+        // val filters = listOf(
+        //     ScanFilter.Builder().setServiceUuid(ParcelUuid(BleUuids.ADVERTISED_SERVICE)).build()
+        // )
+        val filters = emptyList<ScanFilter>() // Scan all devices for now
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
 
         val cb = object : ScanCallback() {

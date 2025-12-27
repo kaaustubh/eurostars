@@ -30,8 +30,8 @@ android {
         applicationId = "com.sensars.eurostars"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.0.7(7)"
+        versionCode = 8
+        versionName = "0.0.7(8)"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
