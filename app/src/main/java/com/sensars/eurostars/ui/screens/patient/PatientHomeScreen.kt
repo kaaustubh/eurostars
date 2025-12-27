@@ -32,22 +32,22 @@ fun PatientHomeScreen(
     Scaffold(
         topBar = {
             if (!isGaitAnalysisDetail) {
-                TopAppBar(
-                    title = { Text("Patient") },
-                    actions = {
-                        IconButton(onClick = { showLogoutConfirm = true }) {
-                            Icon(
-                                imageVector = Icons.Default.ExitToApp,
-                                contentDescription = "Logout"
-                            )
-                        }
+            TopAppBar(
+                title = { Text("Patient") },
+                actions = {
+                    IconButton(onClick = { showLogoutConfirm = true }) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Logout"
+                        )
                     }
-                )
+                }
+            )
             }
         },
         bottomBar = {
             if (!isGaitAnalysisDetail) {
-                PatientBottomBar(navController = dashboardNav)
+            PatientBottomBar(navController = dashboardNav)
             }
         }
     ) { padding ->
