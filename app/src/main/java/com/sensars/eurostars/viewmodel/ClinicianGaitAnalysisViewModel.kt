@@ -154,12 +154,16 @@ class ClinicianGaitAnalysisViewModel(
                 // Calculate Center of Pressure (CoP)
                 calculateCoP(parsedData)
                 
+                // Calculate Lateral Center of Mass
+                calculateLateralCenterOfMass(parsedData)
+                
+                // Calculate Balance (CoP variability)
+                calculateBalance(parsedData)
+                
                 // TODO: Calculate other metrics when formulas are available
                 // Dummy/placeholder metrics (hidden for now)
-                // _lateralCenterOfMass.value = 0.3 // Placeholder
                 // _extrapolatedCenterOfMass.value = 0.4 // Placeholder
                 // _marginOfStability.value = 0.15 // Placeholder
-                // _balance.value = 0.85 // Placeholder
 
             } catch (e: Exception) {
                 _error.value = "Failed to load session data: ${e.message}"
@@ -577,6 +581,146 @@ class ClinicianGaitAnalysisViewModel(
         } else {
             _centerOfPressure.value = null
         }
+    }
+
+    /**
+     * Calculate Lateral Center of Mass (Lateral CoM)
+     * Formula:
+     * Lateral CoM represents the mediolateral (side-to-side) position of the body's center of mass.
+     * 
+     * Calculation based on weight distribution:
+     * Lateral CoM = rightFootLoad / totalLoad
+     * 
+     * Where:
+     * - rightFootLoad = sum of all pressures on right foot
+     * - totalLoad = sum of all pressures on both feet
+     * 
+     * Result is normalized 0.0-1.0:
+     * - 0.0 = all weight on left foot (body CoM shifted left)
+     * - 0.5 = balanced weight distribution (body CoM centered)
+     * - 1.0 = all weight on right foot (body CoM shifted right)
+     */
+    private fun calculateLateralCenterOfMass(dataPoints: List<CsvDataPoint>) {
+        if (dataPoints.isEmpty()) {
+            _lateralCenterOfMass.value = null
+            return
+        }
+
+        var totalLeftLoad = 0.0
+        var totalRightLoad = 0.0
+
+        dataPoints.forEach { point ->
+            val totalPressure = point.taxelValues.sum()
+            
+            if (point.foot.equals("Left", ignoreCase = true)) {
+                totalLeftLoad += totalPressure
+            } else {
+                totalRightLoad += totalPressure
+            }
+        }
+
+        val totalLoad = totalLeftLoad + totalRightLoad
+        if (totalLoad > 0.1) {
+            // Lateral CoM = proportion of load on right foot
+            // 0.0 = all left, 0.5 = balanced, 1.0 = all right
+            val lateralCoM = totalRightLoad / totalLoad
+            _lateralCenterOfMass.value = lateralCoM.coerceIn(0.0, 1.0)
+        } else {
+            _lateralCenterOfMass.value = null
+        }
+    }
+
+    /**
+     * Calculate Balance Index
+     * Formula:
+     * Balance Index = StdDev(CoP_ML) - Standard deviation of Center of Pressure in mediolateral direction
+     * 
+     * Lower standard deviation = better balance (more stable, less sway)
+     * 
+     * Calculation:
+     * 1. Calculate CoP_ML (X coordinate) for each data point
+     * 2. Calculate standard deviation of all CoP_ML values
+     * 3. Normalize for display: Normalized Balance = (Worst ref - Patient value) / (Worst ref - Best ref)
+     *    This inverts so higher = better balance for chart display
+     * 
+     * Reference values (typical ranges):
+     * - Best ref (excellent balance): 0.01 (very low variability)
+     * - Worst ref (poor balance): 0.3 (high variability)
+     * 
+     * Result is normalized 0.0-1.0:
+     * - 0.0 = worst balance (high CoP variability)
+     * - 1.0 = best balance (low CoP variability)
+     */
+    private fun calculateBalance(dataPoints: List<CsvDataPoint>) {
+        if (dataPoints.isEmpty()) {
+            _balance.value = null
+            return
+        }
+
+        // Define taxel positions (same as in calculateCoP)
+        val leftTaxelPositions = listOf(
+            android.graphics.PointF(0.72f, 0.19f), android.graphics.PointF(0.58f, 0.21f),
+            android.graphics.PointF(0.44f, 0.24f), android.graphics.PointF(0.33f, 0.28f),
+            android.graphics.PointF(0.68f, 0.33f), android.graphics.PointF(0.55f, 0.33f),
+            android.graphics.PointF(0.42f, 0.35f), android.graphics.PointF(0.29f, 0.39f),
+            android.graphics.PointF(0.29f, 0.47f), android.graphics.PointF(0.29f, 0.55f),
+            android.graphics.PointF(0.34f, 0.66f), android.graphics.PointF(0.64f, 0.66f),
+            android.graphics.PointF(0.34f, 0.75f), android.graphics.PointF(0.61f, 0.75f),
+            android.graphics.PointF(0.48f, 0.83f), android.graphics.PointF(0.60f, 0.86f),
+            android.graphics.PointF(0.48f, 0.90f), android.graphics.PointF(0.38f, 0.86f)
+        )
+
+        val rightTaxelPositions = leftTaxelPositions.map { 
+            android.graphics.PointF(1.0f - it.x, it.y)
+        }
+
+        // Collect all CoP_ML (X coordinate) values
+        val copMLValues = mutableListOf<Double>()
+
+        dataPoints.forEach { point ->
+            val positions = if (point.foot.equals("Left", ignoreCase = true)) leftTaxelPositions else rightTaxelPositions
+            
+            var sumPiXi = 0.0
+            var sumPi = 0.0
+
+            point.taxelValues.forEachIndexed { i, pressure ->
+                if (i < positions.size) {
+                    sumPiXi += pressure * positions[i].x
+                    sumPi += pressure
+                }
+            }
+
+            if (sumPi > 0.1) { // Avoid division by zero and noisy low pressure
+                val copX = sumPiXi / sumPi
+                copMLValues.add(copX.toDouble())
+            }
+        }
+
+        if (copMLValues.size < 2) {
+            _balance.value = null
+            return
+        }
+
+        // Calculate mean
+        val mean = copMLValues.average()
+
+        // Calculate standard deviation
+        val variance = copMLValues.map { (it - mean) * (it - mean) }.average()
+        val stdDev = kotlin.math.sqrt(variance)
+
+        // Reference values for normalization
+        val bestRef = 0.01  // Excellent balance (very low variability)
+        val worstRef = 0.3  // Poor balance (high variability)
+
+        // Normalize: (Worst ref - Patient value) / (Worst ref - Best ref)
+        // This inverts so higher = better balance
+        val normalizedBalance = if (worstRef > bestRef) {
+            ((worstRef - stdDev) / (worstRef - bestRef)).coerceIn(0.0, 1.0)
+        } else {
+            null
+        }
+
+        _balance.value = normalizedBalance
     }
 }
 

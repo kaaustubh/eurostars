@@ -34,11 +34,11 @@ fun ClinicianGaitAnalysisScreen(
     val cadence by viewModel.cadence.collectAsState()
     val strideLength by viewModel.strideLength.collectAsState()
     val centerOfPressure by viewModel.centerOfPressure.collectAsState()
+    val lateralCenterOfMass by viewModel.lateralCenterOfMass.collectAsState()
+    val balance by viewModel.balance.collectAsState()
     // Dummy/placeholder metrics (hide for now)
-    // val lateralCenterOfMass by viewModel.lateralCenterOfMass.collectAsState()
     // val extrapolatedCenterOfMass by viewModel.extrapolatedCenterOfMass.collectAsState()
     // val marginOfStability by viewModel.marginOfStability.collectAsState()
-    // val balance by viewModel.balance.collectAsState()
     val copTraceLeft by viewModel.copTraceLeft.collectAsState()
     val copTraceRight by viewModel.copTraceRight.collectAsState()
     val loading by viewModel.loading.collectAsState()
@@ -162,13 +162,43 @@ fun ClinicianGaitAnalysisScreen(
                     ),
                     patientValue = centerOfPressure
                 )
+                
+                GaitMetricChart(
+                    config = MetricChartConfig(
+                        title = "Lateral center of mass",
+                        minValue = 0.0,
+                        maxValue = 1.0,
+                        greenMin = 0.4,
+                        greenMax = 0.6,
+                        yellowMin1 = 0.3,
+                        yellowMax1 = 0.4,
+                        yellowMin2 = 0.6,
+                        yellowMax2 = 0.7,
+                        valueFormat = { String.format("%.2f", it) }
+                    ),
+                    patientValue = lateralCenterOfMass
+                )
+                
+                GaitMetricChart(
+                    config = MetricChartConfig(
+                        title = "Balance",
+                        minValue = 0.0,
+                        maxValue = 1.0,
+                        greenMin = 0.7,
+                        greenMax = 0.9,
+                        yellowMin1 = 0.5,
+                        yellowMax1 = 0.7,
+                        yellowMin2 = 0.9,
+                        yellowMax2 = 1.0,
+                        valueFormat = { String.format("%.2f", it) }
+                    ),
+                    patientValue = balance
+                )
                 /*
                  * Dummy/placeholder metrics (hide for now)
                  *
-                 * GaitMetricChart(... patientValue = lateralCenterOfMass)
                  * GaitMetricChart(... patientValue = extrapolatedCenterOfMass)
                  * GaitMetricChart(... patientValue = marginOfStability)
-                 * GaitMetricChart(... patientValue = balance)
                  */
                 
                 Spacer(modifier = Modifier.height(24.dp))
