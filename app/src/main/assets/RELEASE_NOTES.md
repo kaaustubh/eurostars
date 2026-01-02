@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [0.0.8(9)] - 2025-12-26
+## [0.0.8(1)] - 2025-12-26
 
 ### New Features
 - **Lateral Center of Mass**: New gait metric showing mediolateral (side-to-side) position of body's center of mass
@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 ### Technical
 - Implemented calculateLateralCenterOfMass() using weight distribution formula
 - Implemented calculateBalance() using CoP ML standard deviation
-- Set version to 0.0.8(9) with versionCode 9
+- Set version to 0.0.8(1) with versionCode 1
 
 ---
 
