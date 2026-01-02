@@ -1,5 +1,7 @@
 Release notes (update this file each release):
 
+Release 0.0.9:
+
 Release 0.0.8:
 
 New Features:

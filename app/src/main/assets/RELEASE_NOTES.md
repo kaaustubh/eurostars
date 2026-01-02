@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.9(1)] - 2025-12-26
+
+### Technical
+- Set version to 0.0.9(1) with versionCode 1
+
+---
+
 ## [0.0.8(1)] - 2025-12-26
 
 ### New Features
