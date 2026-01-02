@@ -1,5 +1,15 @@
 Release notes (update this file each release):
 
+Release 0.0.8:
+
+New Features:
+- Lateral Center of Mass: New gait metric showing side-to-side body center of mass position.
+- Balance Index: New balance metric based on Center of Pressure variability (lower variability = better balance).
+
+Improvements:
+- Expanded gait analysis from 5 to 7 metrics for more comprehensive analysis.
+- Both new metrics available for clinicians and patients.
+
 Release 0.0.7:
 
 New Features:

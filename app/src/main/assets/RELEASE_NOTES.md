@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.0.8(9)] - 2025-12-26
+
+### New Features
+- **Lateral Center of Mass**: New gait metric showing mediolateral (side-to-side) position of body's center of mass
+  - Calculated based on weight distribution between left and right feet
+  - Normalized 0.0-1.0 scale (0.0 = all weight left, 0.5 = balanced, 1.0 = all weight right)
+- **Balance Index**: New balance metric based on Center of Pressure variability
+  - Uses standard deviation of CoP in mediolateral direction
+  - Lower CoP variability = better balance (more stable)
+  - Normalized for display with reference ranges
+
+### Improvements
+- Expanded gait analysis metrics from 5 to 7 parameters
+- Both new metrics available in clinician and patient gait analysis screens
+
+### Technical
+- Implemented calculateLateralCenterOfMass() using weight distribution formula
+- Implemented calculateBalance() using CoP ML standard deviation
+- Set version to 0.0.8(9) with versionCode 9
+
+---
+
 ## [0.0.7(8)] - 2025-12-26
 
 ### Improvements
