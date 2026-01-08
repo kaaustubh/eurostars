@@ -1,5 +1,28 @@
 Release notes (update this file each release):
 
+Release 0.0.1:
+
+New Features:
+- Sensoria Sensor Support: Added support for Sensoria D20 and E20 sensor protocols.
+- Protocol Detection: Automatic detection of sensor type (Current, Sensoria D20, or Sensoria E20) during pairing.
+- Dynamic Data Display: Sensor data display adapts based on sensor type:
+  - Current sensors: 18 pressure taxels
+  - Sensoria D20: 8 ADC channels
+  - Sensoria E20: 6 ADC channels
+- Sensor Type Display: Shows detected sensor type in pairing screen details.
+
+Technical Improvements:
+- Package refactoring: Migrated from com.sensars.eurostars to com.sensoria.app.
+- App rebranding: Changed app name to "Sensoria".
+- Sensoria Protocol Parsers: Implemented D20 and E20 protocol parsers with bit-packed data handling.
+- Protocol Detector: Automatic protocol detection from GATT services and packet structure.
+- Data Handler Integration: Sensoria sensors integrate seamlessly with existing data flow.
+
+Bug Fixes:
+- Fixed package import errors across the codebase.
+- Resolved compilation errors in navigation and protocol detection.
+- Improved BLE scanning to detect all devices (not just UUID-filtered).
+
 Release 0.0.9:
 
 Release 0.0.8:
