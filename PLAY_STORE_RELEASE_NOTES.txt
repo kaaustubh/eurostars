@@ -23,6 +23,10 @@ Bug Fixes:
 - Resolved compilation errors in navigation and protocol detection.
 - Improved BLE scanning to detect all devices (not just UUID-filtered).
 
+Improvements:
+- Walking Mode Support for Sensoria Sensors: Walking mode now fully supports Sensoria D20 and E20 sensors. CSV files are generated with correct channel counts (6 for E20, 8 for D20, 18 for CURRENT sensors) and adapt automatically based on connected sensor types.
+- Gait Analysis Tab: Limited to session history view only. Navigation to gait analysis detail screen is disabled as the feature is not yet implemented.
+
 Release 0.0.9:
 
 Release 0.0.8:

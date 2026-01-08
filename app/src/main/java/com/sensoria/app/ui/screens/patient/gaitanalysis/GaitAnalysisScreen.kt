@@ -137,7 +137,6 @@ fun SessionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = session.status == UploadStatus.UPLOADED, onClick = onClick)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically

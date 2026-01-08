@@ -30,8 +30,9 @@ fun PatientDashboardNavHost(
         
         composable(PatientTab.GaitAnalysis.route) {
             GaitAnalysisScreen(
-                onSessionClick = { patientId, sessionStartTime ->
-                    navController.navigate("gait_analysis_session/$patientId/$sessionStartTime")
+                onSessionClick = { _, _ ->
+                    // Navigation to gait analysis detail screen is disabled
+                    // Gait matrices feature is not yet implemented
                 }
             )
         }

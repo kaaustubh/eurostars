@@ -422,6 +422,18 @@ class SensorConnectionManager(private val context: Context) {
     fun getDataHandler(): SensorDataHandler = dataHandler
     
     /**
+     * Get truly unified streams that include data from both SensorDataHandler (UUID-based sensors)
+     * and SensoriaDataHandler (Sensoria sensors).
+     * Since Sensoria handlers now also register their streams with SensorDataHandler,
+     * SensorDataHandler's unified streams will include all sensor data.
+     */
+    fun getUnifiedStreams(): SensorDataStreams {
+        // Return SensorDataHandler's unified streams, which now includes Sensoria data
+        // because Sensoria handlers register their streams with SensorDataHandler
+        return dataHandler.getUnifiedStreams()
+    }
+    
+    /**
      * Get the SensoriaDataHandler for a specific sensor, if it exists.
      */
     fun getSensoriaDataHandler(sensorSide: PairingTarget): SensoriaDataHandler? {
@@ -433,10 +445,15 @@ class SensorConnectionManager(private val context: Context) {
     
     /**
      * Create and register a SensoriaDataHandler for a sensor.
+     * Also ensures Sensoria data flows into SensorDataHandler's unified streams for walking mode.
      */
     fun createSensoriaHandler(sensorSide: PairingTarget, sensorType: SensorType, streams: SensorDataStreams): SensoriaDataHandler {
         val handler = SensoriaDataHandler(context, sensorType)
         handler.registerSensor(sensorSide, streams)
+        
+        // Also register the streams with SensorDataHandler so its unifiedStreams includes Sensoria data
+        // This ensures walking mode can capture Sensoria sensor data
+        dataHandler.registerSensor(sensorSide, streams)
         
         when (sensorSide) {
             PairingTarget.LEFT_SENSOR -> leftSensoriaHandler = handler

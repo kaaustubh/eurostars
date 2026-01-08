@@ -39,7 +39,9 @@ class SessionHistoryManager(private val context: Context) {
         leftAccel: List<WalkModeRepository.ImuDataPoint> = emptyList(),
         rightAccel: List<WalkModeRepository.ImuDataPoint> = emptyList(),
         leftGyro: List<WalkModeRepository.ImuDataPoint> = emptyList(),
-        rightGyro: List<WalkModeRepository.ImuDataPoint> = emptyList()
+        rightGyro: List<WalkModeRepository.ImuDataPoint> = emptyList(),
+        leftSensorType: com.sensoria.app.data.ble.SensorType = com.sensoria.app.data.ble.SensorType.CURRENT,
+        rightSensorType: com.sensoria.app.data.ble.SensorType = com.sensoria.app.data.ble.SensorType.CURRENT
     ): WalkSession = withContext(Dispatchers.IO) {
         
         val timestamp = System.currentTimeMillis()
@@ -50,7 +52,8 @@ class SessionHistoryManager(private val context: Context) {
         val csvContent = generateCsvContent(
             leftData, rightData, 
             leftAccel, rightAccel, 
-            leftGyro, rightGyro
+            leftGyro, rightGyro,
+            leftSensorType, rightSensorType
         )
         dataFile.writeText(csvContent)
         val sizeBytes = dataFile.length()
@@ -146,12 +149,36 @@ class SessionHistoryManager(private val context: Context) {
         leftAccel: List<WalkModeRepository.ImuDataPoint>,
         rightAccel: List<WalkModeRepository.ImuDataPoint>,
         leftGyro: List<WalkModeRepository.ImuDataPoint>,
-        rightGyro: List<WalkModeRepository.ImuDataPoint>
+        rightGyro: List<WalkModeRepository.ImuDataPoint>,
+        leftSensorType: com.sensoria.app.data.ble.SensorType,
+        rightSensorType: com.sensoria.app.data.ble.SensorType
     ): String {
+        // Determine number of channels for each sensor
+        val leftChannelCount = when (leftSensorType) {
+            com.sensoria.app.data.ble.SensorType.SENSORIA_D20 -> 8
+            com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> 6
+            com.sensoria.app.data.ble.SensorType.CURRENT -> 18
+        }
+        val rightChannelCount = when (rightSensorType) {
+            com.sensoria.app.data.ble.SensorType.SENSORIA_D20 -> 8
+            com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> 6
+            com.sensoria.app.data.ble.SensorType.CURRENT -> 18
+        }
+        
+        // Use the maximum channel count for CSV (to accommodate both sensors)
+        val maxChannels = maxOf(leftChannelCount, rightChannelCount)
+        
         val sb = StringBuilder()
         // Header
         sb.append("timestamp,foot")
-        for (i in 1..18) sb.append(",taxel${i}_kpa")
+        // Use "channel" for Sensoria sensors, "taxel" for CURRENT sensors
+        val channelLabel = if (leftSensorType == com.sensoria.app.data.ble.SensorType.CURRENT && 
+                               rightSensorType == com.sensoria.app.data.ble.SensorType.CURRENT) {
+            "taxel"
+        } else {
+            "channel"
+        }
+        for (i in 1..maxChannels) sb.append(",$channelLabel${i}_kpa")
         sb.append(",accel_x,accel_y,accel_z")
         sb.append(",gyro_x,gyro_y,gyro_z")
         sb.append("\n")
@@ -196,13 +223,13 @@ class SessionHistoryManager(private val context: Context) {
         
         grouped.forEach { (key, groupEvents) ->
             val (time, foot) = key
-            val pressureValues = DoubleArray(18)
+            val pressureValues = DoubleArray(maxChannels)
             var ax = 0f; var ay = 0f; var az = 0f
             var gx = 0f; var gy = 0f; var gz = 0f
             
             groupEvents.forEach { event ->
                 when (event.type) {
-                    "pressure" -> if (event.index in 0..17) pressureValues[event.index] = event.value
+                    "pressure" -> if (event.index in 0 until maxChannels) pressureValues[event.index] = event.value
                     "accel" -> { ax = event.x; ay = event.y; az = event.z }
                     "gyro" -> { gx = event.x; gy = event.y; gz = event.z }
                 }

@@ -51,8 +51,8 @@ class WalkModeViewModel(application: Application) : AndroidViewModel(application
         _sessionEndTime.value = null
         _uploadError.value = null
         
-        // Start recording in repository
-        walkModeRepo.startSession(connectionManager.getDataHandler().getUnifiedStreams())
+        // Start recording in repository - get unified streams that include both UUID-based and Sensoria sensors
+        walkModeRepo.startSession(connectionManager.getUnifiedStreams())
     }
 
     /**

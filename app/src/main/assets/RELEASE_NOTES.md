@@ -28,4 +28,13 @@ All notable changes to this project will be documented in this file.
 - Resolved compilation errors in navigation and protocol detection
 - Improved BLE scanning to detect all devices (not just UUID-filtered)
 
+### Improvements
+- **Walking Mode Support for Sensoria Sensors**: Walking mode now fully supports Sensoria D20 and E20 sensors
+  - Sensoria sensor data is now captured during walking sessions
+  - CSV files are generated with correct channel counts (6 for E20, 8 for D20, 18 for CURRENT sensors)
+  - CSV format adapts automatically based on connected sensor types
+- **Gait Analysis Tab**: Limited to session history view only
+  - Navigation to gait analysis detail screen is disabled (feature not yet implemented)
+  - Users can view session history but cannot access detail view
+
 ---

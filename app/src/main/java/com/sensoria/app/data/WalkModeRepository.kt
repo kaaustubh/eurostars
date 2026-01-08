@@ -8,6 +8,7 @@ import com.google.firebase.firestore.firestore
 import com.google.firebase.storage.storage
 import com.google.firebase.storage.StorageMetadata
 import com.sensoria.app.data.ble.SensorDataStreams
+import com.sensoria.app.data.ble.SensorType
 import com.sensoria.app.viewmodel.PairingTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ class WalkModeRepository(private val context: Context) {
     private val auth = FirebaseAuth.getInstance()
     private val sessionRepo = SessionRepository(context)
     private val historyManager = SessionHistoryManager(context)
+    private val pairingRepo = PairingRepository(context)
     
     private var activeSessionId: String? = null
     private var sessionStartTime: Long = 0
@@ -163,6 +165,11 @@ class WalkModeRepository(private val context: Context) {
             return
         }
 
+        // Get sensor types for CSV generation
+        val pairingStatus = pairingRepo.pairingStatusFlow.first()
+        val leftSensorType = pairingStatus.leftSensor.sensorType
+        val rightSensorType = pairingStatus.rightSensor.sensorType
+
         // Save session locally first (now saves as CSV)
         val savedSession = historyManager.saveSession(
             displaySessionId = "Pending", 
@@ -174,7 +181,9 @@ class WalkModeRepository(private val context: Context) {
             leftAccel = sessionBuffer.leftAccel,
             rightAccel = sessionBuffer.rightAccel,
             leftGyro = sessionBuffer.leftGyro,
-            rightGyro = sessionBuffer.rightGyro
+            rightGyro = sessionBuffer.rightGyro,
+            leftSensorType = leftSensorType,
+            rightSensorType = rightSensorType
         )
 
         // Attempt upload
