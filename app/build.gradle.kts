@@ -10,7 +10,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sensars.eurostars"
+    namespace = "com.sensoria.app"
     compileSdk {
         version = release(36)
     }
@@ -27,11 +27,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.sensars.eurostars"
+        applicationId = "com.sensoria.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.0.9(1)"
+        versionName = "0.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

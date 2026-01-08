@@ -18,7 +18,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SensarsEurostars">
+        android:theme="@style/Theme.Sensoria">
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"
             android:value="${crashlyticsCollectionEnabled}" />
@@ -27,7 +27,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.SensarsEurostars">
+            android:theme="@style/Theme.Sensoria">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
