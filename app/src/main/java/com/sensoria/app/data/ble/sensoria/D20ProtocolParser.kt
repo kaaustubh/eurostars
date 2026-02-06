@@ -48,8 +48,8 @@ class D20ProtocolParser : SensoriaProtocolParser() {
         
         // Parse bit-packed header
         // Bits 0-3: Message type (should be 0xD)
-        val messageType = read10BitValue(data, 0) shr 6 // First 4 bits
-        if ((messageType and 0x0F) != PACKET_TYPE_D20) {
+        val messageType = (data[0].toInt() and 0x0F)
+        if (messageType != PACKET_TYPE_D20) {
             android.util.Log.w("D20ProtocolParser", "Invalid D20 message type: ${messageType and 0x0F}")
             // Still try to parse, might be valid
         }

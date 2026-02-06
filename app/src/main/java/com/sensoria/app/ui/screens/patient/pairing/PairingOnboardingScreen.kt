@@ -54,6 +54,11 @@ fun PairingOnboardingScreen(
     var leftExpanded by remember { mutableStateOf(!leftSensorState.isPaired) }
     var rightExpanded by remember { mutableStateOf(!rightSensorState.isPaired) }
     
+    // Dynamic sensor type override for Pairing Tab display
+    // Note: The main logic is in SensorDataDisplaySection, but this affects the collapsed/expanded card text
+    // We can't easily get the dynamic type here without observing flows, so we rely on what's passed in.
+    // However, if the ViewModel updates the state based on detected type, it should reflect here.
+    
     // Check if all required sensors are paired
     val allRequiredSensorsPaired = when {
         isLeftLegNeeded && isRightLegNeeded -> leftSensorState.isPaired && rightSensorState.isPaired
@@ -426,8 +431,9 @@ private fun SensorDetailRow(
 private fun formatSensorType(sensorType: com.sensoria.app.data.ble.SensorType): String {
     return when (sensorType) {
         com.sensoria.app.data.ble.SensorType.CURRENT -> "Current Sensor"
-        com.sensoria.app.data.ble.SensorType.SENSORIA_D20 -> "Sensoria D20"
-        com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> "Sensoria E20"
+        com.sensoria.app.data.ble.SensorType.SENSORIA_D20 -> "D20"
+        com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> "E20"
+        com.sensoria.app.data.ble.SensorType.SENSORIA_STREAM_V1 -> "K20"
     }
 }
 

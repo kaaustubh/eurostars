@@ -12,6 +12,9 @@ enum class SensorType {
     SENSORIA_D20,
     
     /** Sensoria sensor using E20 protocol */
-    SENSORIA_E20
+    SENSORIA_E20,
+    
+    /** Sensoria sensor using Stream V1 protocol (0x5A header) */
+    SENSORIA_STREAM_V1
 }
 

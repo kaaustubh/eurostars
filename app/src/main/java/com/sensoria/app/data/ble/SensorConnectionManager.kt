@@ -8,6 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import com.sensoria.app.data.ble.sensoria.SensoriaDataHandler
+import com.sensoria.app.data.ble.sensoria.SensoriaDataHandlerFactory
+import com.sensoria.app.data.ble.sensoria.SensoriaSdkAdapter
+import com.sensoria.app.data.ble.SensorType
 import com.sensoria.app.viewmodel.PairingTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,8 +41,9 @@ class SensorConnectionManager(private val context: Context) {
     private val dataHandler = SensorDataHandler(context)
     
     // Store SensoriaDataHandler instances per sensor (created when sensor type is detected)
-    private var leftSensoriaHandler: SensoriaDataHandler? = null
-    private var rightSensoriaHandler: SensoriaDataHandler? = null
+    // Can be either SensoriaDataHandler (custom) or SensoriaSdkAdapter (SDK)
+    private var leftSensoriaHandler: Any? = null
+    private var rightSensoriaHandler: Any? = null
 
     private val _leftSensorConnection = MutableStateFlow<SensorConnection?>(null)
     val leftSensorConnection: StateFlow<SensorConnection?> = _leftSensorConnection.asStateFlow()
@@ -158,10 +162,21 @@ class SensorConnectionManager(private val context: Context) {
         val connectedState = SensorConnection(address, sensorSide, SensorConnectionState.CONNECTED, gatt)
         
         // Request high connection priority for faster updates
+        val priorityRequest = {
         try {
             gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                android.util.Log.d("SensorConnectionManager", "Requested HIGH priority for ${gatt.device.address}")
         } catch (e: Exception) {
             android.util.Log.w("SensorConnectionManager", "Failed to request connection priority: ${e.message}")
+            }
+        }
+        
+        priorityRequest()
+        
+        // Retry after 3 seconds to override SDK initialization
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            kotlinx.coroutines.delay(3000)
+            priorityRequest()
         }
 
         when (sensorSide) {
@@ -262,7 +277,7 @@ class SensorConnectionManager(private val context: Context) {
             }
             
             var detectedSensorType: SensorType? = storedSensorType
-            var sensoriaHandler: SensoriaDataHandler? = null
+            var sensoriaHandler: Any? = null // Can be SensoriaDataHandler or SensoriaSdkAdapter
 
             // Connect via BleRepository
             bleRepository.connect(
@@ -272,16 +287,30 @@ class SensorConnectionManager(private val context: Context) {
                 
                 // Create Sensoria handler if sensor type was detected as Sensoria
                 detectedSensorType?.let { sensorType ->
-                    if (sensorType == SensorType.SENSORIA_D20 || sensorType == SensorType.SENSORIA_E20) {
-                        sensoriaHandler = createSensoriaHandler(sensorSide, sensorType, streams)
+                    if (sensorType == SensorType.SENSORIA_D20 || 
+                        sensorType == SensorType.SENSORIA_E20 ||
+                        sensorType == SensorType.SENSORIA_STREAM_V1) {
+                        sensoriaHandler = createSensoriaHandler(sensorSide, sensorType, streams, address)
                     }
                 }
                 
-                // Request low power connection priority
+                // Request high connection priority for streaming
+                // We request it immediately AND after a delay to ensure it overrides any low-power request from the SDK
+                val priorityRequest = {
                 try {
-                    gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER)
+                        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                        android.util.Log.d("SensorConnectionManager", "Requested HIGH priority for ${gatt.device.address}")
                 } catch (e: Exception) {
                     android.util.Log.w("SensorConnectionManager", "Failed to request connection priority: ${e.message}")
+                    }
+                }
+                
+                priorityRequest()
+                
+                // Retry after 3 seconds to override SDK initialization
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    kotlinx.coroutines.delay(3000)
+                    priorityRequest()
                 }
 
                 when (sensorSide) {
@@ -435,8 +464,9 @@ class SensorConnectionManager(private val context: Context) {
     
     /**
      * Get the SensoriaDataHandler for a specific sensor, if it exists.
+     * Returns either SensoriaDataHandler (custom) or SensoriaSdkAdapter (SDK).
      */
-    fun getSensoriaDataHandler(sensorSide: PairingTarget): SensoriaDataHandler? {
+    fun getSensoriaDataHandler(sensorSide: PairingTarget): Any? {
         return when (sensorSide) {
             PairingTarget.LEFT_SENSOR -> leftSensoriaHandler
             PairingTarget.RIGHT_SENSOR -> rightSensoriaHandler
@@ -444,16 +474,47 @@ class SensorConnectionManager(private val context: Context) {
     }
     
     /**
+     * Get sensor type from handler (works for both SDK and custom implementations).
+     */
+    fun getSensoriaHandlerSensorType(sensorSide: PairingTarget): SensorType? {
+        val handler = getSensoriaDataHandler(sensorSide) ?: return null
+        return SensoriaDataHandlerFactory.getSensorType(handler)
+    }
+    
+    /**
      * Create and register a SensoriaDataHandler for a sensor.
+     * Uses factory to create either SDK or custom implementation based on feature flag.
      * Also ensures Sensoria data flows into SensorDataHandler's unified streams for walking mode.
      */
-    fun createSensoriaHandler(sensorSide: PairingTarget, sensorType: SensorType, streams: SensorDataStreams): SensoriaDataHandler {
-        val handler = SensoriaDataHandler(context, sensorType)
-        handler.registerSensor(sensorSide, streams)
+    fun createSensoriaHandler(sensorSide: PairingTarget, sensorType: SensorType, streams: SensorDataStreams, explicitAddress: String? = null): Any {
+        // Get device address for SDK adapter (if needed)
+        val deviceAddress = explicitAddress ?: when (sensorSide) {
+            PairingTarget.LEFT_SENSOR -> leftSensorConnection.value?.address ?: ""
+            PairingTarget.RIGHT_SENSOR -> rightSensorConnection.value?.address ?: ""
+        }
         
-        // Also register the streams with SensorDataHandler so its unifiedStreams includes Sensoria data
-        // This ensures walking mode can capture Sensoria sensor data
+        // Use factory to create appropriate handler
+        val handler = SensoriaDataHandlerFactory.createHandler(
+            context = context,
+            deviceAddress = deviceAddress,
+            sensorType = sensorType,
+            sensorSide = sensorSide,
+            streams = streams,
+            mirrorUnifiedStreams = dataHandler.getUnifiedStreams()
+        )
+        
+        // If using SDK adapter, start it
+        if (handler is SensoriaSdkAdapter) {
+            handler.start()
+            // SDK will connect automatically, but we can also call connect() explicitly
+            handler.connect()
+            // Register streams with global data handler so UI can access them
+            dataHandler.registerSensor(sensorSide, streams)
+        } else if (handler is SensoriaDataHandler) {
+            // Custom handler: register sensor and ensure unified streams
+            handler.registerSensor(sensorSide, streams)
         dataHandler.registerSensor(sensorSide, streams)
+        }
         
         when (sensorSide) {
             PairingTarget.LEFT_SENSOR -> leftSensoriaHandler = handler
@@ -469,11 +530,31 @@ class SensorConnectionManager(private val context: Context) {
     fun cleanupSensoriaHandler(sensorSide: PairingTarget) {
         when (sensorSide) {
             PairingTarget.LEFT_SENSOR -> {
-                leftSensoriaHandler?.unregisterSensor(sensorSide)
+                leftSensoriaHandler?.let { handler ->
+                    when (handler) {
+                        is SensoriaSdkAdapter -> {
+                            handler.stop()
+                            handler.disconnect()
+                        }
+                        is SensoriaDataHandler -> {
+                            handler.unregisterSensor(sensorSide)
+                        }
+                    }
+                }
                 leftSensoriaHandler = null
             }
             PairingTarget.RIGHT_SENSOR -> {
-                rightSensoriaHandler?.unregisterSensor(sensorSide)
+                rightSensoriaHandler?.let { handler ->
+                    when (handler) {
+                        is SensoriaSdkAdapter -> {
+                            handler.stop()
+                            handler.disconnect()
+                        }
+                        is SensoriaDataHandler -> {
+                            handler.unregisterSensor(sensorSide)
+                        }
+                    }
+                }
                 rightSensoriaHandler = null
             }
         }

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ AndroidManifest.xml
+  ~ Module: SensoriaSdk.sdk
+  ~ Copyright (c) 2022 Sensoria Health Inc.
+  ~ All rights reserved
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="io.sensoria.sdk" >
+
+    <uses-sdk android:minSdkVersion="26" />
+
+    <!-- Request legacy Bluetooth permissions on older devices (sdk <= api30) -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- REMOVED IN SDK23.11a to avoid unnecessary policy requirements at Google Play Store -->
+    <!-- This permission needed if your app supports sdk <= api30 -->
+    <!--
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
+    -->
+
+
+    <!-- REMOVED IN SDK23.11a to avoid unnecessary policy requirements at Google Play Store -->
+    <!-- This permission needed if your app supports sdk <= api30 and runs bluetooth in the background -->
+    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" android:maxSdkVersion="30" /> -->
+
+
+    <!-- Strongly assert Bluetooth is not used for location -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="31" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- DO NOT REMOVE THIS below - still needed to run on build < Android 10 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+
+    <application android:label="@string/app_name" >
+        <service
+            android:name="io.sensoria.sdk.services.NordicDfuService"
+            android:exported="false" />
+    </application>
+
+</manifest>

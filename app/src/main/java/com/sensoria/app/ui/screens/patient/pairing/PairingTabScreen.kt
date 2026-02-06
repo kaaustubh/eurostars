@@ -42,7 +42,9 @@ import com.sensoria.app.data.SessionRepository
 import com.sensoria.app.viewmodel.PairingState
 import com.sensoria.app.viewmodel.PairingTarget
 import com.sensoria.app.viewmodel.bluetoothPairingViewModel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @Composable
 fun PairingTabScreen() {
@@ -119,9 +121,38 @@ fun PairingTabScreen() {
     LaunchedEffect(leftConnected) {
         if (leftConnected) {
             val dataHandler = connectionManager.getDataHandler()
-            dataHandler.getPressureFlow(PairingTarget.LEFT_SENSOR).collect { sample ->
+            val streams = dataHandler.getSensorStreams(PairingTarget.LEFT_SENSOR)
+            coroutineScope {
+                launch {
+                    streams.pressure.collect {
+                        leftDataCount++
+                        leftLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.accel.collect {
+                        leftDataCount++
+                        leftLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.gyro.collect {
+                        leftDataCount++
+                        leftLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.temperature.collect {
+                        leftDataCount++
+                        leftLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.deviceTime.collect {
                 leftDataCount++
                 leftLastDataTime = System.currentTimeMillis()
+                    }
+                }
             }
         } else {
             leftDataCount = 0
@@ -133,9 +164,38 @@ fun PairingTabScreen() {
     LaunchedEffect(rightConnected) {
         if (rightConnected) {
             val dataHandler = connectionManager.getDataHandler()
-            dataHandler.getPressureFlow(PairingTarget.RIGHT_SENSOR).collect { sample ->
+            val streams = dataHandler.getSensorStreams(PairingTarget.RIGHT_SENSOR)
+            coroutineScope {
+                launch {
+                    streams.pressure.collect {
+                        rightDataCount++
+                        rightLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.accel.collect {
+                        rightDataCount++
+                        rightLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.gyro.collect {
+                        rightDataCount++
+                        rightLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.temperature.collect {
+                        rightDataCount++
+                        rightLastDataTime = System.currentTimeMillis()
+                    }
+                }
+                launch {
+                    streams.deviceTime.collect {
                 rightDataCount++
                 rightLastDataTime = System.currentTimeMillis()
+                    }
+                }
             }
         } else {
             rightDataCount = 0

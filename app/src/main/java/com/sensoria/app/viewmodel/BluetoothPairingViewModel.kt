@@ -12,6 +12,7 @@ import com.sensoria.app.data.ble.GattDeviceInfo
 import com.sensoria.app.data.ble.SensorConnectionManager
 import com.sensoria.app.data.ble.SensorDataStreams
 import com.sensoria.app.data.ble.SensorType
+import com.sensoria.app.data.ble.sensoria.SensoriaProtocolDetector
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -193,11 +194,11 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
         _uiState.value = _uiState.value.copy(pairingState = PairingState.CONNECTING, errorMessage = null)
 
         var gattInfo: GattDeviceInfo? = null
-        var detectedSensorType: SensorType? = null
+        var detectedSensorType: SensorType? = SensoriaProtocolDetector().detectFromAdvertising(device.name)
         // Create streams for this sensor (will be used by SensorConnectionManager)
         val streams = SensorDataStreams()
         val dataHandler = connectionManager.getDataHandler()
-        var sensoriaHandler: com.sensoria.app.data.ble.sensoria.SensoriaDataHandler? = null
+        var sensoriaHandler: Any? = null // Can be SensoriaDataHandler or SensoriaSdkAdapter
         
         // Connect with data handler set up from the start
         bleRepository.connect(
@@ -206,9 +207,14 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
                 viewModelScope.launch {
                     try {
                         // Create Sensoria handler if sensor type was detected as Sensoria
+                        // Note: Handler creation is now done in BleRepository during service discovery
+                        // This is kept for compatibility but may not be needed
                         detectedSensorType?.let { sensorType ->
-                            if (sensorType == SensorType.SENSORIA_D20 || sensorType == SensorType.SENSORIA_E20) {
-                                sensoriaHandler = connectionManager.createSensoriaHandler(target, sensorType, streams)
+                            if (sensorType == SensorType.SENSORIA_D20 || 
+                                sensorType == SensorType.SENSORIA_E20 ||
+                                sensorType == SensorType.SENSORIA_STREAM_V1) {
+                                // Handler will be created by SensorConnectionManager during service discovery
+                                // No need to create here as it's handled in BleRepository
                             }
                         }
                         
@@ -258,15 +264,62 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
                 detectedSensorType = sensorType
                 android.util.Log.d("BluetoothPairingViewModel", "Sensor type detected: $sensorType for device ${device.address}")
                 
-                // Validate that if it's a Sensoria sensor, it's D20 or E20
+                // Validate that if it's a Sensoria sensor, it's D20, E20, or Stream V1 (K20)
                 if (sensorType != SensorType.CURRENT && 
                     sensorType != SensorType.SENSORIA_D20 && 
-                    sensorType != SensorType.SENSORIA_E20) {
+                    sensorType != SensorType.SENSORIA_E20 &&
+                    sensorType != SensorType.SENSORIA_STREAM_V1) {
                     viewModelScope.launch {
                         _uiState.value = _uiState.value.copy(
                             pairingState = PairingState.ERROR,
-                            errorMessage = "Unsupported sensor protocol. Only Sensoria D20 and E20 protocols are supported."
+                            errorMessage = "Unsupported sensor protocol. Only Sensoria D20, E20, and Stream V1 (K20) protocols are supported."
                         )
+                    }
+                    return@connect
+                }
+
+                // For Sensoria Stream V1 (K20), ensure we are using the correct handler (SDK vs Custom)
+                // Always recreate handler when sensor type is detected to ensure fresh connection state
+                // This prevents duplicate handlers if multiple service discoveries occur
+                if (sensorType == SensorType.SENSORIA_STREAM_V1 || 
+                    sensorType == SensorType.SENSORIA_D20 ||
+                    sensorType == SensorType.SENSORIA_E20) {
+                        connectionManager.cleanupSensoriaHandler(target)
+                        connectionManager.createSensoriaHandler(target, sensorType, streams, device.address)
+                }
+
+                // Persist sensor type if packet detection happens after pairing
+                viewModelScope.launch {
+                    val currentStatus = pairingRepo.pairingStatusFlow.first()
+                    when (target) {
+                        PairingTarget.LEFT_SENSOR -> {
+                            if (currentStatus.isLeftPaired && currentStatus.leftSensor.deviceId == device.address &&
+                                currentStatus.leftSensor.sensorType != sensorType) {
+                                pairingRepo.setLeftSensor(
+                                    currentStatus.leftSensor.deviceId ?: return@launch,
+                                    currentStatus.leftSensor.deviceName,
+                                    currentStatus.leftSensor.serialNumber,
+                                    currentStatus.leftSensor.firmwareVersion,
+                                    currentStatus.leftSensor.batteryLevel,
+                                    currentStatus.leftSensor.rssi,
+                                    sensorType
+                                )
+                            }
+                        }
+                        PairingTarget.RIGHT_SENSOR -> {
+                            if (currentStatus.isRightPaired && currentStatus.rightSensor.deviceId == device.address &&
+                                currentStatus.rightSensor.sensorType != sensorType) {
+                                pairingRepo.setRightSensor(
+                                    currentStatus.rightSensor.deviceId ?: return@launch,
+                                    currentStatus.rightSensor.deviceName,
+                                    currentStatus.rightSensor.serialNumber,
+                                    currentStatus.rightSensor.firmwareVersion,
+                                    currentStatus.rightSensor.batteryLevel,
+                                    currentStatus.rightSensor.rssi,
+                                    sensorType
+                                )
+                            }
+                        }
                     }
                 }
             },
@@ -318,7 +371,7 @@ class BluetoothPairingViewModel(application: Application) : AndroidViewModel(app
             streams = streams,
             sensorSide = target,
             dataHandler = dataHandler,
-            sensoriaDataHandler = sensoriaHandler
+            sensoriaDataHandler = null // Handler is created during service discovery in BleRepository
         )
     }
 

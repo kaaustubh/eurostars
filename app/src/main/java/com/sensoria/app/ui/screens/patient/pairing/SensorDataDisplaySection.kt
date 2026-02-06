@@ -54,6 +54,10 @@ fun SensorDataDisplaySection(
     var rightTemp by remember { mutableStateOf<Float?>(null) }
     var rightTime by remember { mutableStateOf<Long?>(null) }
     
+    // Dynamic sensor type state
+    var dynamicLeftType by remember(leftSensorType) { mutableStateOf(leftSensorType) }
+    var dynamicRightType by remember(rightSensorType) { mutableStateOf(rightSensorType) }
+    
     // Collect data from left sensor
     LaunchedEffect(leftConnected) {
         if (leftConnected) {
@@ -67,8 +71,16 @@ fun SensorDataDisplaySection(
                 launch {
                     try {
                         pressureFlow.collect { sample ->
-                            if (leftConnected && sample.pascalValue != null) { // Only store calibrated values
-                                leftPressures = leftPressures + (sample.taxelIndex to sample.pascalValue)
+                            if (leftConnected) {
+                                // Store Pascal value if available, otherwise raw value (as Double for compatibility)
+                                val value = sample.pascalValue ?: sample.value.toDouble()
+                                leftPressures = leftPressures + (sample.taxelIndex to value)
+                                
+                                // Update dynamic type if different (and not CURRENT default)
+                                if (sample.protocol != com.sensoria.app.data.ble.SensorType.CURRENT && 
+                                    sample.protocol != dynamicLeftType) {
+                                    dynamicLeftType = sample.protocol
+                                }
                             }
                         }
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -161,8 +173,16 @@ fun SensorDataDisplaySection(
                 launch {
                     try {
                         pressureFlow.collect { sample ->
-                            if (rightConnected && sample.pascalValue != null) { // Only store calibrated values
-                                rightPressures = rightPressures + (sample.taxelIndex to sample.pascalValue)
+                            if (rightConnected) {
+                                // Store Pascal value if available, otherwise raw value (as Double for compatibility)
+                                val value = sample.pascalValue ?: sample.value.toDouble()
+                                rightPressures = rightPressures + (sample.taxelIndex to value)
+                                
+                                // Update dynamic type if different (and not CURRENT default)
+                                if (sample.protocol != com.sensoria.app.data.ble.SensorType.CURRENT && 
+                                    sample.protocol != dynamicRightType) {
+                                    dynamicRightType = sample.protocol
+                                }
                             }
                         }
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -274,7 +294,7 @@ fun SensorDataDisplaySection(
                     gyroZ = leftGyroZ,
                     temp = leftTemp,
                     time = leftTime,
-                    sensorType = leftSensorType
+                    sensorType = dynamicLeftType ?: leftSensorType // Use dynamic if available
                 )
             }
             
@@ -290,7 +310,7 @@ fun SensorDataDisplaySection(
                     gyroZ = rightGyroZ,
                     temp = rightTemp,
                     time = rightTime,
-                    sensorType = rightSensorType
+                    sensorType = dynamicRightType ?: rightSensorType // Use dynamic if available
                 )
             }
             
@@ -324,6 +344,7 @@ private fun SensorDataCard(
     val maxChannels = when (sensorType) {
         com.sensoria.app.data.ble.SensorType.SENSORIA_D20 -> 8
         com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> 6
+        com.sensoria.app.data.ble.SensorType.SENSORIA_STREAM_V1 -> 4
         com.sensoria.app.data.ble.SensorType.CURRENT -> 18 // Current sensors have 18 taxels
         null -> 18 // Default to 18 if unknown
     }
@@ -346,14 +367,18 @@ private fun SensorDataCard(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            Text(
+                text = "Type: ${formatSensorTypeLabel(sensorType)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             
             // Pressure Taxels/Channels
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val channelLabel = when (sensorType) {
-                    com.sensoria.app.data.ble.SensorType.SENSORIA_D20, 
-                    com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> "ADC Channels"
-                    else -> "Pressure Taxels"
-                }
+                val isSensoria = sensorType == com.sensoria.app.data.ble.SensorType.SENSORIA_D20 ||
+                    sensorType == com.sensoria.app.data.ble.SensorType.SENSORIA_E20 ||
+                    sensorType == com.sensoria.app.data.ble.SensorType.SENSORIA_STREAM_V1
+                val channelLabel = if (isSensoria) "Channels" else "Pressure Taxels"
                 Text(
                     text = "$channelLabel (${pressures.size}/$maxChannels):",
                     style = MaterialTheme.typography.labelMedium,
@@ -369,6 +394,7 @@ private fun SensorDataCard(
                     (0 until maxChannels).forEach { index ->
                         val pascalValue = pressures[index]
                         val hasValue = pascalValue != null && pascalValue > 0
+                        val indexLabel = if (isSensoria) "ch$index" else "t${index + 1}"
                         val displayText = if (hasValue && pascalValue != null) {
                             // Format with appropriate precision based on value size
                             when {
@@ -392,12 +418,23 @@ private fun SensorDataCard(
                                 .padding(4.dp),
                             contentAlignment = androidx.compose.ui.Alignment.Center
                         ) {
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                Text(
+                                    text = indexLabel,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 8.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                // Check if this is likely a raw value (SDK/K20) or calibrated
+                                val isRaw = sensorType == com.sensoria.app.data.ble.SensorType.SENSORIA_STREAM_V1
+                                val unit = if (isRaw) "" else "Pa"
                             Text(
-                                text = if (hasValue) "${displayText}Pa" else displayText,
+                                    text = if (hasValue) "$displayText$unit" else displayText,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 8.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            }
                         }
                     }
                 }
@@ -443,6 +480,18 @@ private fun SensorDataCard(
                 )
             }
         }
+    }
+}
+
+private fun formatSensorTypeLabel(
+    sensorType: com.sensoria.app.data.ble.SensorType?
+): String {
+    return when (sensorType) {
+        com.sensoria.app.data.ble.SensorType.SENSORIA_D20 -> "D20"
+        com.sensoria.app.data.ble.SensorType.SENSORIA_E20 -> "E20"
+        com.sensoria.app.data.ble.SensorType.SENSORIA_STREAM_V1 -> "K20"
+        com.sensoria.app.data.ble.SensorType.CURRENT -> "Current Sensor"
+        null -> "Unknown"
     }
 }
 

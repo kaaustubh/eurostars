@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics)
+    alias(libs.plugins.firebase.app.distribution)
     id("kotlin-parcelize")
 }
 
@@ -65,7 +66,6 @@ android {
                 mappingFileUploadEnabled = false
                 nativeSymbolUploadEnabled = false
             }
-
         }
         debug {
             manifestPlaceholders["crashlyticsCollectionEnabled"] = "false"
@@ -88,7 +88,18 @@ android {
     }
 }
 
+// Firebase App Distribution configuration
+firebaseAppDistribution {
+    appId = "1:159286426351:android:e9d37b2de426a797eab91a" // Sensoria app ID from google-services.json
+    releaseNotes = "Sensoria app release"
+    groups = "testers" // You can change this to your tester group name
+    // Optional: Add testers directly
+    // testers = "email1@example.com,email2@example.com"
+}
+
 dependencies {
+    // Sensoria SDK (parallel implementation)
+    implementation(files("libs/sensoria-io-sdk-23.11a-debug.aar"))
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     // Compose
     implementation("androidx.compose.ui:ui:1.7.0")

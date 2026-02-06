@@ -23,8 +23,14 @@ object BleUuids {
     val BATTERY_SERVICE: UUID = from16(0x180F)
     
     // Sensoria services
+    // C-client reference: 0x1cac0001, 0x656e, 0x696c, 0x4b5f, 0x6e6572726157
     val SENSORIA_STREAMING_SERVICE: UUID = uuid("1cac0001-656e-696c-4b5f-6e6572726157")
     val SENSORIA_CONTROL_POINT_SERVICE: UUID = uuid("1cac0001-656e-696c-4b5f-5f6e6167654e")
+    
+    // Sensoria characteristics
+    val SENSORIA_STREAMING_CHAR: UUID = uuid("1cac0003-656e-696c-4b5f-6e6572726157") // Pressure stream (0x5A)
+    val SENSORIA_IMU_CHAR_0004: UUID = uuid("1cac0004-656e-696c-4b5f-6e6572726157") // IMU stream (0xF0) - Left sensor
+    val SENSORIA_IMU_CHAR_0005: UUID = uuid("1cac0005-656e-696c-4b5f-6e6572726157") // IMU stream (0xF0) - Right sensor
 
     // Pressure characteristics explicit list
     val PRESSURE_DATA_CHARS: List<UUID> = listOf(

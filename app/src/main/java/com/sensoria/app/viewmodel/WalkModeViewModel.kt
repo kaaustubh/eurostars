@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.sensoria.app.EurostarsApp
 import com.sensoria.app.data.WalkModeRepository
 import com.sensoria.app.data.ble.SensorConnectionManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,13 +70,17 @@ class WalkModeViewModel(application: Application) : AndroidViewModel(application
             walkModeRepo.stopSession(
                 save = save,
                 onSuccess = {
+                    viewModelScope.launch(Dispatchers.Main) {
                     _uploading.value = false
                     onSuccess()
+                    }
                 },
                 onError = { error ->
+                    viewModelScope.launch(Dispatchers.Main) {
                     _uploading.value = false
                     _uploadError.value = error
                     onError(error)
+                    }
                 }
             )
         }

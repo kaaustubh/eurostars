@@ -13,21 +13,27 @@ data class PressureSample(
     val value: Long, // Raw sensor value
     val pascalValue: Double? = null, // Calibrated value in Pascals (null if not yet calibrated)
     val timestampNanos: Long,
-    val sensorSide: PairingTarget
+    val sensorSide: PairingTarget,
+    val tick: Int = -1, // Protocol sequence number
+    val protocol: SensorType = SensorType.CURRENT
 )
 data class AccelSample(
     val x: Float,
     val y: Float,
     val z: Float,
     val timestampNanos: Long,
-    val sensorSide: PairingTarget
+    val sensorSide: PairingTarget,
+    val tick: Int = -1,
+    val protocol: SensorType = SensorType.CURRENT
 )
 data class GyroSample(
     val x: Float,
     val y: Float,
     val z: Float,
     val timestampNanos: Long,
-    val sensorSide: PairingTarget
+    val sensorSide: PairingTarget,
+    val tick: Int = -1,
+    val protocol: SensorType = SensorType.CURRENT
 )
 data class TemperatureSample(
     val celsius: Float,

@@ -62,7 +62,7 @@ class E20ProtocolParser : SensoriaProtocolParser() {
         
         // Parse bit-packed header
         // Bits 0-3: Message type (should be 0xE)
-        val messageType = (data[0].toInt() and 0xFF) shr 4
+        val messageType = (data[0].toInt() and 0x0F)  // Fixed: read lower nibble, not upper
         if (messageType != PACKET_TYPE_E20) {
             android.util.Log.w("E20ProtocolParser", "Invalid E20 message type: $messageType")
         }
@@ -83,8 +83,8 @@ class E20ProtocolParser : SensoriaProtocolParser() {
         accelRange = getAccelScale(gRange)
         gyroRange = getGyroScale(dpsRange)
         
-        // Calculate packet length (E20 is ~20 bytes total)
-        val packetLength = 20
+        // Calculate packet length (E20 is 152 bits = 19 bytes total)
+        val packetLength = 19
         
         return PacketHeader(
             packetType = messageType,
